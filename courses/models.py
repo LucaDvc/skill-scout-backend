@@ -23,6 +23,7 @@ class Course(models.Model):
     ])
     image = models.ImageField(null=True, blank=True)  # add default
     tags = models.ManyToManyField('Tag', blank=True)
+    active = models.BooleanField(default=False, null=False, blank=False)
 
     @property
     def average_rating(self):
