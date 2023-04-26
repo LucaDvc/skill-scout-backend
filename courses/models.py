@@ -4,11 +4,12 @@ from django.core.validators import MaxValueValidator, MinValueValidator, MinLeng
 from django.db import models
 import uuid
 from django.db.models import Avg
+from users.models import Instructor
 
 
 class Course(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    # instructors
+    instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)  # maybe change the on_delete behaviour
     title = models.CharField(max_length=100, null=False, blank=False)
     intro = models.TextField(max_length=300, null=True, blank=True)  # change to False for production
     description = models.TextField(null=True, blank=True, validators=[
