@@ -1,5 +1,6 @@
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager, UserManager
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+import uuid
 
 
 class CustomUserManager(BaseUserManager):
@@ -66,3 +67,23 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
+
+
+class Instructor(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.__str__()
+
+
+class Learner(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    active_courses = models.ManyToManyField('courses.Course', related_name='active_courses')
+    favourite_courses = models.ManyToManyField('courses.Course', related_name='favourite_courses')
+    completed_courses = models.ManyToManyField('courses.Course', related_name='completed_courses')
+    wishlist = models.ManyToManyField('courses.Course', related_name='wishlist')
+
+    def __str__(self):
+        return self.user.__str__()
