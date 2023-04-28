@@ -17,7 +17,7 @@ class Course(models.Model):
     ])  # change to True for production
     requirements = models.TextField(null=True, blank=True)  # change to False for production
     total_hours = models.DecimalField(max_digits=3, decimal_places=0, null=True, blank=True)  # change to False for production
-    creation_date = models.DateTimeField(auto_now_add=True)
+    creation_date = models.DateTimeField(auto_now_add=True, editable=False)
     release_date = models.DateField(null=True, blank=True)
     price = models.DecimalField(default=0, max_digits=4, decimal_places=0, null=True,blank=True, validators=[
         MinValueValidator(0)
@@ -48,7 +48,7 @@ class Review(models.Model):
         MaxValueValidator(5)
     ])
     comment = models.TextField(max_length=500, null=True, blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True)
+    creation_date = models.DateTimeField(auto_now_add=True)  # change to last edited
 
     class Meta:
         constraints = [
@@ -72,6 +72,7 @@ class Chapter(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     title = models.CharField(max_length=100, null=False, blank=False)
+    creation_date = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self):
         return self.title
@@ -81,6 +82,23 @@ class Lesson(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE)
     title = models.CharField(max_length=50, null=False, blank=False)
+    order = models.PositiveIntegerField(null=False, blank=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def recalculate_order_values(self, chapter=None):
+        if chapter is None:
+            chapter = self.chapter
+        remaining_lessons = chapter.lesson_set.all().order_by('order')
+        for index, lesson in enumerate(remaining_lessons, start=1):
+            if lesson.order != index:
+                lesson.order = index
+                lesson.save()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        self.recalculate_order_values()
 
     def __str__(self):
         return self.title
@@ -90,6 +108,11 @@ class TextLessonStep(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     text = models.TextField(null=True, blank=True)  # change to False for production
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
+    order = models.PositiveIntegerField(editable=True)
+
+    class Meta:
+        unique_together = ('lesson', 'order')
+        ordering = ['order']
 
 
 class QuizLessonStep(models.Model):
@@ -98,6 +121,11 @@ class QuizLessonStep(models.Model):
     question = models.TextField(max_length=500, null=False, blank=False)
     explanation = models.TextField(max_length=500, null=True, blank=True)  # change to False for production
     preserve_order = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(editable=True)
+
+    class Meta:
+        unique_together = ('lesson', 'order')
+        ordering = ['order']
 
 
 class QuizChoice(models.Model):
@@ -116,3 +144,8 @@ class VideoLessonStep(models.Model):
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
     ])  # change to False for production, add upload_to=...
+    order = models.PositiveIntegerField(editable=True)
+
+    class Meta:
+        unique_together = ('lesson', 'order')
+        ordering = ['order']
