@@ -1,5 +1,6 @@
 import datetime
-
+from itertools import chain
+from operator import attrgetter
 from django.core.validators import MaxValueValidator, MinValueValidator, MinLengthValidator, FileExtensionValidator
 from django.db import models
 import uuid
@@ -96,6 +97,16 @@ class Lesson(models.Model):
                 lesson.order = index
                 lesson.save()
 
+    def get_lesson_steps(self):
+        text_steps = self.textlessonstep_set.all()
+        quiz_steps = self.quizlessonstep_set.all()
+        video_steps = self.videolessonstep_set.all()
+
+        return sorted(
+            chain(text_steps, quiz_steps, video_steps),
+            key=attrgetter('order')
+        )
+
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
         self.recalculate_order_values()
@@ -104,27 +115,39 @@ class Lesson(models.Model):
         return self.title
 
 
-class TextLessonStep(models.Model):
+class BaseLessonStep(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    text = models.TextField(null=True, blank=True)  # change to False for production
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
-    order = models.PositiveIntegerField(editable=True)
+    order = models.PositiveIntegerField(editable=True, blank=True)
 
     class Meta:
-        unique_together = ('lesson', 'order')
+        abstract = True
+        ordering = ['order']
+
+    def recalculate_order_values(self):
+        remaining_steps = self.lesson.get_lesson_steps()
+        for index, step in enumerate(remaining_steps, start=1):
+            if index != step.order:
+                step.order = index
+                step.save()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        self.recalculate_order_values()
+
+
+class TextLessonStep(BaseLessonStep):
+    text = models.TextField(null=True, blank=True)  # change to False for production
+
+    class Meta:
         ordering = ['order']
 
 
-class QuizLessonStep(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
+class QuizLessonStep(BaseLessonStep):
     question = models.TextField(max_length=500, null=False, blank=False)
     explanation = models.TextField(max_length=500, null=True, blank=True)  # change to False for production
-    preserve_order = models.BooleanField(default=True)
-    order = models.PositiveIntegerField(editable=True)
 
     class Meta:
-        unique_together = ('lesson', 'order')
         ordering = ['order']
 
 
@@ -138,14 +161,10 @@ class QuizChoice(models.Model):
         return self.text
 
 
-class VideoLessonStep(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
+class VideoLessonStep(BaseLessonStep):
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
     ])  # change to False for production, add upload_to=...
-    order = models.PositiveIntegerField(editable=True)
 
     class Meta:
-        unique_together = ('lesson', 'order')
         ordering = ['order']

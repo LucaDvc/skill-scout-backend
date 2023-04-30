@@ -6,8 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from users.models import Instructor
-from .serializers import CourseSerializer, TagSerializer, ChapterSerializer, LessonSerializer
-from courses.models import Course, Chapter, Lesson
+from .serializers import CourseSerializer, TagSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer
+from courses.models import Course, Chapter, Lesson, TextLessonStep
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -129,3 +129,72 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                         order = new_order
 
         serializer.save(chapter=chapter, order=order)
+
+
+class BaseLessonStepListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        if 'order' in self.request.data:
+            raise serializers.ValidationError(
+                {"order": "You cannot set the order value directly when creating a new lesson step."})
+        if 'type' in self.request.data:
+            raise serializers.ValidationError(
+                {"type": "You cannot set the type value for a lesson step."})
+        lesson = Lesson.objects.get(id=self.kwargs['lesson_id'], chapter__course__instructor__user=self.request.user)
+        last_lesson_step = len(lesson.get_lesson_steps())
+        highest_order = last_lesson_step if last_lesson_step else 0
+        serializer.save(lesson=lesson, order=highest_order + 1)
+
+
+class BaseLessonStepRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        lesson_step = self.get_object()
+        lesson = lesson_step.lesson
+        order = lesson_step.order
+        if self.request.data.get('order'):
+            new_order = int(self.request.data.get('order'))
+            if order == new_order or new_order is None:
+                serializer.save(lesson=lesson, order=order)
+                return
+            elif new_order > len(lesson.get_lesson_steps()):
+                raise serializers.ValidationError(
+                        {"order": "Order value cannot be bigger than the total number of lesson steps in the lesson"}
+                    )
+            else:
+                lesson_steps = lesson.get_lesson_steps()
+                if new_order > order:
+                    affected_lesson_steps = list(
+                        filter(lambda x: order < x.order <= new_order, lesson_steps))
+                    for step in affected_lesson_steps:
+                        step.order = step.order - 1
+                        step.save()
+                    order = new_order
+                else:
+                    affected_lesson_steps = list(
+                        filter(lambda x: new_order <= x.order < order, lesson_steps))
+                    for step in affected_lesson_steps:
+                        step.order = step.order + 1
+                        step.save()
+                    order = new_order
+
+        serializer.save(lesson=lesson, order=order)
+
+
+class TextLessonStepListCreateView(BaseLessonStepListCreateView):
+    serializer_class = TextLessonStepSerializer
+
+    def get_queryset(self):
+        lesson_id = self.kwargs['lesson_id']
+        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
+        return TextLessonStep.objects.filter(lesson=lesson)
+
+
+class TextLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
+    serializer_class = TextLessonStepSerializer
+
+    def get_queryset(self):
+        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        return TextLessonStep.objects.filter(lesson__in=lessons)

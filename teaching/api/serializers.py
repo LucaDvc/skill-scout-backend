@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
-from .mixins import StepTypeMixin
+from .mixins import LessonStepSerializerMixin
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -20,10 +20,10 @@ class BaseModelSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
 
-class TextLessonStepSerializer(BaseModelSerializer, StepTypeMixin):
+class TextLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     class Meta:
         model = TextLessonStep
-        fields = '__all__'
+        fields = ['id', 'type', 'order', 'text']
 
 
 class QuizChoiceSerializer(BaseModelSerializer):
@@ -32,18 +32,18 @@ class QuizChoiceSerializer(BaseModelSerializer):
         exclude = ['quiz']
 
 
-class QuizLessonStepSerializer(BaseModelSerializer, StepTypeMixin):
+class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     quiz_choices = QuizChoiceSerializer(many=True)
 
     class Meta:
         model = QuizLessonStep
-        fields = '__all__'
+        exclude = ['lesson']
 
 
-class VideoLessonStepSerializer(BaseModelSerializer, StepTypeMixin):
+class VideoLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     class Meta:
         model = VideoLessonStep
-        fields = '__all__'
+        exclude = ['lesson']
 
 
 class LessonSerializer(BaseModelSerializer):
@@ -53,6 +53,11 @@ class LessonSerializer(BaseModelSerializer):
     class Meta:
         model = Lesson
         fields = ['id', 'order', 'title', 'chapter_id', 'lesson_steps']
+
+    def validate(self, data):
+        if data.get('order') <= 0:
+            raise serializers.ValidationError({"order": "Order must be greater or equal to 1."})
+        return data
 
     def get_lesson_steps(self, obj):
         text_steps = TextLessonStepSerializer(obj.textlessonstep_set.all(), many=True).data
