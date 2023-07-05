@@ -1,4 +1,3 @@
-from django.db import transaction, IntegrityError
 from django.db.models import F
 from rest_framework import generics, status, serializers
 from rest_framework.generics import get_object_or_404
@@ -6,8 +5,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from users.models import Instructor
-from .serializers import CourseSerializer, TagSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer
-from courses.models import Course, Chapter, Lesson, TextLessonStep
+from .serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer,\
+    QuizLessonStepSerializer, QuizChoiceSerializer
+from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -36,7 +36,7 @@ class CourseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         return Course.objects.filter(instructor__user=user)
 
     def get_object(self):
-        course_id = self.kwargs.get('pk')
+        course_id = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=course_id)
 
 
@@ -59,6 +59,10 @@ class ChapterRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Chapter.objects.filter(course__instructor__user=self.request.user)
+
+    def get_object(self):
+        chapter_id = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=chapter_id)
 
 
 class LessonListCreateView(generics.ListCreateAPIView):
@@ -85,6 +89,10 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+
+    def get_object(self):
+        lesson_id = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=lesson_id)
 
     def perform_update(self, serializer):
         lesson = self.get_object()
@@ -150,6 +158,10 @@ class BaseLessonStepListCreateView(generics.ListCreateAPIView):
 class BaseLessonStepRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
+    def get_object(self):
+        pk = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=pk)
+
     def perform_update(self, serializer):
         lesson_step = self.get_object()
         lesson = lesson_step.lesson
@@ -198,3 +210,51 @@ class TextLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
     def get_queryset(self):
         lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
         return TextLessonStep.objects.filter(lesson__in=lessons)
+
+
+class QuizLessonStepListCreateView(BaseLessonStepListCreateView):
+    serializer_class = QuizLessonStepSerializer
+
+    def get_queryset(self):
+        lesson_id = self.kwargs['lesson_id']
+        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
+        return QuizLessonStep.objects.filter(lesson=lesson)
+
+
+class QuizLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
+    serializer_class = QuizLessonStepSerializer
+
+    def get_queryset(self):
+        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        return QuizLessonStep.objects.filter(lesson__in=lessons)
+
+
+class QuizChoiceListCreateView(generics.ListCreateAPIView):
+    serializer_class = QuizChoiceSerializer
+
+    def get_queryset(self):
+        quiz_id = self.kwargs['quiz_id']
+        quiz = QuizLessonStep.objects.get(id=quiz_id, lesson__chapter__course__instructor__user=self.request.user)
+        return QuizChoice.objects.filter(quiz=quiz)
+
+    def perform_create(self, serializer):
+        quiz_id = self.kwargs['quiz_id']
+        quiz = QuizLessonStep.objects.get(id=quiz_id, lesson__chapter__course__instructor__user=self.request.user)
+        serializer.save(quiz=quiz)
+
+
+class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = QuizChoiceSerializer
+
+    def get_queryset(self):
+        quizzes = QuizLessonStep.objects.filter(lesson__chapter__course__instructor__user=self.request.user)
+        return QuizChoice.objects.filter(quiz__in=quizzes)
+
+    def get_object(self):
+        pk = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=pk)
+
+    def perform_update(self, serializer):
+        quiz_choice = self.get_object()
+        quiz = quiz_choice.quiz
+        serializer.save(quiz=quiz)

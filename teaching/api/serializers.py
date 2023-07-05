@@ -29,15 +29,29 @@ class TextLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
 class QuizChoiceSerializer(BaseModelSerializer):
     class Meta:
         model = QuizChoice
-        exclude = ['quiz']
+        fields = ['id', 'text', 'correct']
 
 
 class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
-    quiz_choices = QuizChoiceSerializer(many=True)
+    quiz_choices = QuizChoiceSerializer(many=True, required=False)
 
     class Meta:
         model = QuizLessonStep
-        exclude = ['lesson']
+        fields = ['id', 'type', 'order', 'question', 'explanation', 'quiz_choices']
+
+    def create(self, validated_data):
+        quiz_choices_data = validated_data.pop('quiz_choices', [])
+        quiz_lesson_step = QuizLessonStep.objects.create(**validated_data)
+
+        for quiz_choice_data in quiz_choices_data:
+            QuizChoice.objects.create(quiz=quiz_lesson_step, **quiz_choice_data)
+
+        return quiz_lesson_step
+
+    def to_representation(self, obj):
+        representation = super().to_representation(obj)
+        representation['quiz_choices'] = QuizChoiceSerializer(obj.quizchoice_set.all(), many=True).data
+        return representation
 
 
 class VideoLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
@@ -110,4 +124,4 @@ class CourseSerializer(BaseModelSerializer):
         return instance
 
     def get_chapters(self, obj):
-        return ChapterSerializer(obj.chapter_set.all(), many=True).data
+        return ChapterSerializer(obj.chapter_set.all(), many=True, required=False).data

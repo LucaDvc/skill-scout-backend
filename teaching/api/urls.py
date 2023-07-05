@@ -16,4 +16,14 @@ urlpatterns = [
          name='text-step-list-create'),
     path('text-steps/<uuid:pk>/', views.TextLessonStepRetrieveUpdateDestroyView.as_view(),
          name='text-step-retrieve-update-destroy'),
+
+    path('lessons/<uuid:lesson_id>/quiz-steps/', views.QuizLessonStepListCreateView.as_view(),
+         name='quiz-step-list-create'),
+    path('quiz-steps/<uuid:pk>/', views.QuizLessonStepRetrieveUpdateDestroyView.as_view(),
+         name='quiz-step-retrieve-update-destroy'),
+
+    path('quiz-steps/<uuid:quiz_id>/quiz-choices/', views.QuizChoiceListCreateView.as_view(),
+         name='quiz-choice-list-create'),
+    path('quiz-choices/<uuid:pk>/', views.QuizChoiceRetrieveUpdateDestroyView.as_view(),
+         name='quiz-choice-retrieve-update-destroy'),
 ]

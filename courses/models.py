@@ -88,15 +88,6 @@ class Lesson(models.Model):
     class Meta:
         ordering = ['order']
 
-    def recalculate_order_values(self, chapter=None):
-        if chapter is None:
-            chapter = self.chapter
-        remaining_lessons = chapter.lesson_set.all().order_by('order')
-        for index, lesson in enumerate(remaining_lessons, start=1):
-            if lesson.order != index:
-                lesson.order = index
-                lesson.save()
-
     def get_lesson_steps(self):
         text_steps = self.textlessonstep_set.all()
         quiz_steps = self.quizlessonstep_set.all()
@@ -106,6 +97,15 @@ class Lesson(models.Model):
             chain(text_steps, quiz_steps, video_steps),
             key=attrgetter('order')
         )
+
+    def recalculate_order_values(self, chapter=None):
+        if chapter is None:
+            chapter = self.chapter
+        remaining_lessons = chapter.lesson_set.all().order_by('order')
+        for index, lesson in enumerate(remaining_lessons, start=1):
+            if lesson.order != index:
+                lesson.order = index
+                lesson.save()
 
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
