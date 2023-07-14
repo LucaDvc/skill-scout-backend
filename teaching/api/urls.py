@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import VideoLessonStepListCreateView, VideoLessonStepRetrieveUpdateDestroyView
 
 urlpatterns = [
     path('courses/', views.CourseListCreateView.as_view(), name='course-list-create'),
@@ -26,4 +27,9 @@ urlpatterns = [
          name='quiz-choice-list-create'),
     path('quiz-choices/<uuid:pk>/', views.QuizChoiceRetrieveUpdateDestroyView.as_view(),
          name='quiz-choice-retrieve-update-destroy'),
+
+    path('lessons/<uuid:lesson_id>/video-steps/', VideoLessonStepListCreateView.as_view(),
+         name='video-step-list-create'),
+    path('video-steps/<uuid:pk>/', VideoLessonStepRetrieveUpdateDestroyView.as_view(),
+         name='video-step-retrieve-update-destroy'),
 ]

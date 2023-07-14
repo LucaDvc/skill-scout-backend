@@ -1,13 +1,14 @@
 from django.db.models import F
 from rest_framework import generics, status, serializers
 from rest_framework.generics import get_object_or_404
+from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from users.models import Instructor
-from .serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer,\
-    QuizLessonStepSerializer, QuizChoiceSerializer
-from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice
+from .serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
+    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer
+from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -258,3 +259,21 @@ class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView)
         quiz_choice = self.get_object()
         quiz = quiz_choice.quiz
         serializer.save(quiz=quiz)
+
+
+class VideoLessonStepListCreateView(BaseLessonStepListCreateView):
+    serializer_class = VideoLessonStepSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def get_queryset(self):
+        lesson_id = self.kwargs['lesson_id']
+        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
+        return VideoLessonStep.objects.filter(lesson=lesson)
+
+
+class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
+    serializer_class = VideoLessonStepSerializer
+
+    def get_queryset(self):
+        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        return VideoLessonStep.objects.filter(lesson__in=lessons)

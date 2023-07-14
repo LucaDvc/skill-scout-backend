@@ -170,7 +170,28 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATICFILES_DIRS = [
+    BASE_DIR / 'static'
+]
+
+MEDIA_URL = '/media/'
+
+MEDIA_ROOT = BASE_DIR / 'static/media'
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 # Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+# https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# # S3 configuration
+# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+#
+# AWS_QUERYSTRING_AUTH = False
+# AWS_S3_FILE_OVERWRITE = False
+#
+# AWS_ACCESS_KEY_ID = 'AKIAQ2UDAD2NDVSFE45N'
+# AWS_SECRET_ACCESS_KEY = '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'
+# AWS_STORAGE_BUCKET_NAME = 'devsearch-bucket-cc'
+

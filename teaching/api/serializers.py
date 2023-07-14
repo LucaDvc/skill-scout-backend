@@ -57,7 +57,7 @@ class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
 class VideoLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     class Meta:
         model = VideoLessonStep
-        exclude = ['lesson']
+        fields = ['id', 'order', 'title', 'video_file']
 
 
 class LessonSerializer(BaseModelSerializer):
@@ -110,7 +110,8 @@ class CourseSerializer(BaseModelSerializer):
 
     class Meta:
         model = Course
-        exclude = ['instructor']
+        fields = ['id', 'title', 'intro', 'description', 'requirements', 'total_hours', 'chapters',
+                  'creation_date', 'release_date', 'price', 'image', 'tags', 'active']
 
     def update(self, instance, validated_data):
         tags_data = validated_data.pop('tags', [])

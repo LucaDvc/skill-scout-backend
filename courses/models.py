@@ -1,4 +1,3 @@
-import datetime
 from itertools import chain
 from operator import attrgetter
 from django.core.validators import MaxValueValidator, MinValueValidator, MinLengthValidator, FileExtensionValidator
@@ -20,7 +19,7 @@ class Course(models.Model):
     total_hours = models.DecimalField(max_digits=3, decimal_places=0, null=True, blank=True)  # change to False for production
     creation_date = models.DateTimeField(auto_now_add=True, editable=False)
     release_date = models.DateField(null=True, blank=True)
-    price = models.DecimalField(default=0, max_digits=4, decimal_places=0, null=True,blank=True, validators=[
+    price = models.DecimalField(default=0, max_digits=4, decimal_places=0, null=True, blank=True, validators=[
         MinValueValidator(0)
     ])
     image = models.ImageField(null=True, blank=True)  # add default
@@ -162,6 +161,7 @@ class QuizChoice(models.Model):
 
 
 class VideoLessonStep(BaseLessonStep):
+    title = models.CharField(max_length=150, null=True, blank=True)  # change to False
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
     ])  # change to False for production, add upload_to=...
