@@ -4,7 +4,9 @@ from django.core.validators import MaxValueValidator, MinValueValidator, MinLeng
 from django.db import models
 import uuid
 from django.db.models import Avg
-from users.models import Instructor
+
+from learning.models import CourseEnrollment
+from users.models import Instructor, Learner
 
 
 class Course(models.Model):
@@ -25,6 +27,7 @@ class Course(models.Model):
     image = models.ImageField(null=True, blank=True)  # add default
     tags = models.ManyToManyField('Tag', blank=True)
     active = models.BooleanField(default=False, null=False, blank=False)
+    enrolled_learners = models.ManyToManyField(Learner, through=CourseEnrollment, related_name='courses_enrolled')
 
     @property
     def average_rating(self):
@@ -42,7 +45,7 @@ class Course(models.Model):
 class Review(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    # learner =
+    learner = models.ForeignKey(Learner, on_delete=models.CASCADE)
     rating = models.IntegerField(null=False, blank=False, validators=[
         MinValueValidator(1),
         MaxValueValidator(5)
@@ -53,11 +56,11 @@ class Review(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(check=models.Q(rating__range=(1, 5)), name='rating_between_1_5'),
-            models.UniqueConstraint(fields=['rating'], name='rating_once')  # add learner field to constraint later
+            models.UniqueConstraint(fields=['course', 'learner'], name='unique_review_per_learner_per_course')
         ]
 
     def __str__(self):
-        return self.course.__str__() + ': ' + self.rating.__str__()
+        return f'{self.course}, {self.learner} : {self.rating} stars'
 
 
 class Tag(models.Model):

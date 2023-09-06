@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 import uuid
 
+from learning.models import CourseEnrollment
+
 
 class CustomUserManager(BaseUserManager):
     def _create_user(self, email, password, first_name, last_name, **extra_fields):
@@ -80,10 +82,8 @@ class Instructor(models.Model):
 class Learner(models.Model):
     id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    active_courses = models.ManyToManyField('courses.Course', related_name='active_courses')
-    favourite_courses = models.ManyToManyField('courses.Course', related_name='favourite_courses')
-    completed_courses = models.ManyToManyField('courses.Course', related_name='completed_courses')
-    wishlist = models.ManyToManyField('courses.Course', related_name='wishlist')
+    enrolled_courses = models.ManyToManyField('courses.Course', through=CourseEnrollment, related_name='learners_enrolled')
+    wishlist = models.ManyToManyField('courses.Course', related_name='wishlisted_by', blank=True)
 
     def __str__(self):
         return self.user.__str__()
