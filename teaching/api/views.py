@@ -7,8 +7,9 @@ from rest_framework.response import Response
 
 from learning.models import CourseEnrollment
 from users.models import Instructor
-from .serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
-    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CourseEnrollmentSerializer
+from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
+    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer
+from .serializers import CourseEnrollmentSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
 
 
@@ -32,7 +33,6 @@ class CourseListCreateView(generics.ListCreateAPIView):
 class CourseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
-
     def get_queryset(self):
         user = self.request.user
         return Course.objects.filter(instructor__user=user)
