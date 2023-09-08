@@ -5,9 +5,10 @@ from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from learning.models import CourseEnrollment
 from users.models import Instructor
 from .serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
-    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer
+    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CourseEnrollmentSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
 
 
@@ -277,3 +278,15 @@ class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestr
     def get_queryset(self):
         lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
         return VideoLessonStep.objects.filter(lesson__in=lessons)
+
+
+class CourseEnrolledLearnersView(generics.ListAPIView):
+    serializer_class = CourseEnrollmentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        courses = Course.objects.filter(instructor__user=user)
+        course_id = self.kwargs['course_id']
+        course = get_object_or_404(courses, id=course_id)
+        return CourseEnrollment.objects.filter(course=course)

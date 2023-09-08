@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
+from learning.models import CourseEnrollment
+from users.api.serializers import LearnerSerializer
 from .mixins import LessonStepSerializerMixin
 
 
@@ -126,3 +128,11 @@ class CourseSerializer(BaseModelSerializer):
 
     def get_chapters(self, obj):
         return ChapterSerializer(obj.chapter_set.all(), many=True, required=False).data
+
+
+class CourseEnrollmentSerializer(serializers.ModelSerializer):
+    learner = LearnerSerializer(read_only=True)
+
+    class Meta:
+        model = CourseEnrollment
+        fields = ['learner', 'active', 'completed', 'favourite', 'enrolled_at']

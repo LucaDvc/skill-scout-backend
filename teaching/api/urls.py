@@ -6,6 +6,9 @@ urlpatterns = [
     path('courses/', views.CourseListCreateView.as_view(), name='course-list-create'),
     path('courses/<uuid:pk>/', views.CourseRetrieveUpdateDestroyView.as_view(), name='course-retrieve-update-destroy'),
 
+    path('courses/<uuid:course_id>/enrolled_learners/', views.CourseEnrolledLearnersView.as_view(),
+         name='course-enrolled-learners'),
+
     path('courses/<uuid:course_id>/chapters/', views.ChapterListCreateView.as_view(), name='chapter-list-create'),
     path('chapters/<uuid:pk>/', views.ChapterRetrieveUpdateDestroyView.as_view(),
          name='chapter-retrieve-update-destroy'),
@@ -32,4 +35,5 @@ urlpatterns = [
          name='video-step-list-create'),
     path('video-steps/<uuid:pk>/', VideoLessonStepRetrieveUpdateDestroyView.as_view(),
          name='video-step-retrieve-update-destroy'),
+
 ]
