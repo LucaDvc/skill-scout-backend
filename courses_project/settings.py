@@ -129,8 +129,12 @@ WSGI_APPLICATION = 'courses_project.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'railway',
+        'USER': 'postgres',
+        'PASSWORD': 'kcuOfdX0nJQOUkxcedNG',
+        'HOST': 'containers-us-west-38.railway.app',
+        'PORT': '6817',
     }
 }
 
