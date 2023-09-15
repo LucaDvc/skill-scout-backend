@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 
 class LessonStepSerializerMixin(serializers.Serializer):
+    id = serializers.UUIDField(source='base_step.id', read_only=True)
+    order = serializers.IntegerField(source='base_step.order', read_only=True)
     type = serializers.SerializerMethodField(method_name='get_step_type')
 
     def get_step_type(self, obj):

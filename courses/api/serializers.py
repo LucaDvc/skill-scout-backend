@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
+from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
+    BaseLessonStep
 from .mixins import LessonStepSerializerMixin
 
 
@@ -18,6 +19,12 @@ class BaseModelSerializer(serializers.ModelSerializer):
             )
 
         return super().to_internal_value(data)
+
+
+class BaseLessonStepSerializer(BaseModelSerializer):
+    class Meta:
+        model = BaseLessonStep
+        fields = ['id', 'order']
 
 
 class TextLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
@@ -69,17 +76,23 @@ class LessonSerializer(BaseModelSerializer):
         fields = ['id', 'order', 'title', 'chapter_id', 'lesson_steps']
 
     def validate(self, data):
-        if data.get('order') <= 0:
+        order = data.get('order')
+        if order is not None and order <= 0:
             raise serializers.ValidationError({"order": "Order must be greater or equal to 1."})
         return data
 
     def get_lesson_steps(self, obj):
-        text_steps = TextLessonStepSerializer(obj.textlessonstep_set.all(), many=True).data
-        quiz_steps = QuizLessonStepSerializer(obj.quizlessonstep_set.all(), many=True).data
-        video_steps = VideoLessonStepSerializer(obj.videolessonstep_set.all(), many=True).data
+        all_steps = BaseLessonStep.objects.filter(lesson=obj)
+        serialized_steps = []
+        for step in all_steps:
+            if hasattr(step, 'text_step'):
+                serialized_steps.append(TextLessonStepSerializer(step.text_step).data)
+            elif hasattr(step, 'quiz_step'):
+                serialized_steps.append(QuizLessonStepSerializer(step.quiz_step).data)
+            elif hasattr(step, 'video_step'):
+                serialized_steps.append(VideoLessonStepSerializer(step.video_step).data)
 
-        all_steps = text_steps + quiz_steps + video_steps
-        ordered_steps = sorted(all_steps, key=lambda x: x['order'])
+        ordered_steps = sorted(serialized_steps, key=lambda x: x['order'])
 
         return ordered_steps
 
@@ -92,7 +105,7 @@ class ChapterSerializer(BaseModelSerializer):
 
     class Meta:
         model = Chapter
-        exclude = ['course']
+        fields = ['id', 'title', 'creation_date', 'lessons']
 
     def get_lessons(self, obj):
         return LessonSerializer(obj.lesson_set.all(), many=True, required=False).data

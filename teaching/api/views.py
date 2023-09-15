@@ -10,7 +10,8 @@ from users.models import Instructor
 from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
     QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer
 from .serializers import CourseEnrollmentSerializer
-from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep
+from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
+    BaseLessonStep
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -33,6 +34,7 @@ class CourseListCreateView(generics.ListCreateAPIView):
 class CourseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         user = self.request.user
         return Course.objects.filter(instructor__user=user)
@@ -79,7 +81,7 @@ class LessonListCreateView(generics.ListCreateAPIView):
         if 'order' in self.request.data:
             raise serializers.ValidationError(
                 {"order": "You cannot set the order value directly when creating a new lesson."})
-        chapter = Chapter.objects.get(id=self.kwargs['chapter_id'], course__instructor__user=self.request.user)
+        chapter = get_object_or_404(Chapter, id=self.kwargs['chapter_id'], course__instructor__user=self.request.user)
         last_lesson = Lesson.objects.filter(chapter=chapter).order_by('-order').first()
         highest_order = last_lesson.order if last_lesson else 0
         serializer.save(chapter=chapter, order=highest_order + 1)
@@ -144,6 +146,9 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 class BaseLessonStepListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
+    def get_lesson(self):
+        return get_object_or_404(Lesson, id=self.kwargs['lesson_id'], chapter__course__instructor__user=self.request.user)
+
     def perform_create(self, serializer):
         if 'order' in self.request.data:
             raise serializers.ValidationError(
@@ -151,10 +156,11 @@ class BaseLessonStepListCreateView(generics.ListCreateAPIView):
         if 'type' in self.request.data:
             raise serializers.ValidationError(
                 {"type": "You cannot set the type value for a lesson step."})
-        lesson = Lesson.objects.get(id=self.kwargs['lesson_id'], chapter__course__instructor__user=self.request.user)
-        last_lesson_step = len(lesson.get_lesson_steps())
+        lesson = self.get_lesson()
+        last_lesson_step = len(lesson.baselessonstep_set.all())
         highest_order = last_lesson_step if last_lesson_step else 0
-        serializer.save(lesson=lesson, order=highest_order + 1)
+        base_lesson_step = BaseLessonStep.objects.create(lesson=lesson, order=highest_order + 1)
+        serializer.save(base_step=base_lesson_step)
 
 
 class BaseLessonStepRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -162,48 +168,50 @@ class BaseLessonStepRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIV
 
     def get_object(self):
         pk = self.kwargs['pk']
-        return get_object_or_404(self.get_queryset(), id=pk)
+        return get_object_or_404(self.get_queryset(), base_step__id=pk)
 
     def perform_update(self, serializer):
         lesson_step = self.get_object()
-        lesson = lesson_step.lesson
-        order = lesson_step.order
+        base_lesson_step = lesson_step.base_step
+        lesson = base_lesson_step.lesson
+        order = base_lesson_step.order
+        all_lesson_steps = lesson.baselessonstep_set.all()
         if self.request.data.get('order'):
             new_order = int(self.request.data.get('order'))
             if order == new_order or new_order is None:
-                serializer.save(lesson=lesson, order=order)
+                base_lesson_step.save()
+                serializer.save()
                 return
-            elif new_order > len(lesson.get_lesson_steps()):
+            elif new_order > len(all_lesson_steps):
                 raise serializers.ValidationError(
                         {"order": "Order value cannot be bigger than the total number of lesson steps in the lesson"}
                     )
             else:
-                lesson_steps = lesson.get_lesson_steps()
                 if new_order > order:
                     affected_lesson_steps = list(
-                        filter(lambda x: order < x.order <= new_order, lesson_steps))
+                        filter(lambda x: order < x.order <= new_order, all_lesson_steps))
                     for step in affected_lesson_steps:
                         step.order = step.order - 1
                         step.save()
-                    order = new_order
+                    base_lesson_step.order = new_order
                 else:
                     affected_lesson_steps = list(
-                        filter(lambda x: new_order <= x.order < order, lesson_steps))
+                        filter(lambda x: new_order <= x.order < order, all_lesson_steps))
                     for step in affected_lesson_steps:
                         step.order = step.order + 1
                         step.save()
-                    order = new_order
+                    base_lesson_step.order = new_order
 
-        serializer.save(lesson=lesson, order=order)
+        base_lesson_step.save()
+        serializer.save()
 
 
 class TextLessonStepListCreateView(BaseLessonStepListCreateView):
     serializer_class = TextLessonStepSerializer
 
     def get_queryset(self):
-        lesson_id = self.kwargs['lesson_id']
-        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
-        return TextLessonStep.objects.filter(lesson=lesson)
+        lesson = self.get_lesson()
+        return TextLessonStep.objects.filter(base_step__lesson=lesson)
 
 
 class TextLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
@@ -211,16 +219,15 @@ class TextLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
 
     def get_queryset(self):
         lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
-        return TextLessonStep.objects.filter(lesson__in=lessons)
+        return TextLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
 class QuizLessonStepListCreateView(BaseLessonStepListCreateView):
     serializer_class = QuizLessonStepSerializer
 
     def get_queryset(self):
-        lesson_id = self.kwargs['lesson_id']
-        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
-        return QuizLessonStep.objects.filter(lesson=lesson)
+        lesson = self.get_lesson()
+        return QuizLessonStep.objects.filter(base_step__lesson=lesson)
 
 
 class QuizLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
@@ -228,20 +235,23 @@ class QuizLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
 
     def get_queryset(self):
         lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
-        return QuizLessonStep.objects.filter(lesson__in=lessons)
+        return QuizLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
 class QuizChoiceListCreateView(generics.ListCreateAPIView):
     serializer_class = QuizChoiceSerializer
 
-    def get_queryset(self):
+    def get_quiz_step(self):
         quiz_id = self.kwargs['quiz_id']
-        quiz = QuizLessonStep.objects.get(id=quiz_id, lesson__chapter__course__instructor__user=self.request.user)
+        return QuizLessonStep.objects.get(base_step_id=quiz_id,
+                                          base_step__lesson__chapter__course__instructor__user=self.request.user)
+
+    def get_queryset(self):
+        quiz = self.get_quiz_step()
         return QuizChoice.objects.filter(quiz=quiz)
 
     def perform_create(self, serializer):
-        quiz_id = self.kwargs['quiz_id']
-        quiz = QuizLessonStep.objects.get(id=quiz_id, lesson__chapter__course__instructor__user=self.request.user)
+        quiz = self.get_quiz_step()
         serializer.save(quiz=quiz)
 
 
@@ -249,7 +259,7 @@ class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView)
     serializer_class = QuizChoiceSerializer
 
     def get_queryset(self):
-        quizzes = QuizLessonStep.objects.filter(lesson__chapter__course__instructor__user=self.request.user)
+        quizzes = QuizLessonStep.objects.filter(base_step__lesson__chapter__course__instructor__user=self.request.user)
         return QuizChoice.objects.filter(quiz__in=quizzes)
 
     def get_object(self):
@@ -268,8 +278,8 @@ class VideoLessonStepListCreateView(BaseLessonStepListCreateView):
 
     def get_queryset(self):
         lesson_id = self.kwargs['lesson_id']
-        lesson = Lesson.objects.get(id=lesson_id, chapter__course__instructor__user=self.request.user)
-        return VideoLessonStep.objects.filter(lesson=lesson)
+        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor__user=self.request.user)
+        return VideoLessonStep.objects.filter(base_step__lesson=lesson)
 
 
 class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
@@ -277,7 +287,7 @@ class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestr
 
     def get_queryset(self):
         lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
-        return VideoLessonStep.objects.filter(lesson__in=lessons)
+        return VideoLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
 class CourseEnrolledLearnersView(generics.ListAPIView):

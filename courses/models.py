@@ -1,5 +1,5 @@
-from itertools import chain
-from operator import attrgetter
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, MinLengthValidator, FileExtensionValidator
 from django.db import models
 import uuid
@@ -90,16 +90,6 @@ class Lesson(models.Model):
     class Meta:
         ordering = ['order']
 
-    def get_lesson_steps(self):
-        text_steps = self.textlessonstep_set.all()
-        quiz_steps = self.quizlessonstep_set.all()
-        video_steps = self.videolessonstep_set.all()
-
-        return sorted(
-            chain(text_steps, quiz_steps, video_steps),
-            key=attrgetter('order')
-        )
-
     def recalculate_order_values(self, chapter=None):
         if chapter is None:
             chapter = self.chapter
@@ -123,11 +113,15 @@ class BaseLessonStep(models.Model):
     order = models.PositiveIntegerField(editable=True, blank=True)
 
     class Meta:
-        abstract = True
         ordering = ['order']
 
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'text_step') + hasattr(self, 'quiz_step') + hasattr(self, 'video_step') > 1:
+            raise ValidationError('A BaseLessonStep can only have one type of child step.')
+        super().save(*args, **kwargs)
+
     def recalculate_order_values(self):
-        remaining_steps = self.lesson.get_lesson_steps()
+        remaining_steps = self.lesson.baselessonstep_set.all()
         for index, step in enumerate(remaining_steps, start=1):
             if index != step.order:
                 step.order = index
@@ -138,36 +132,30 @@ class BaseLessonStep(models.Model):
         self.recalculate_order_values()
 
 
-class TextLessonStep(BaseLessonStep):
+class TextLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='text_step')
     text = models.TextField(null=True, blank=True)  # change to False for production
 
-    class Meta:
-        ordering = ['order']
 
-
-class QuizLessonStep(BaseLessonStep):
+class QuizLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='quiz_step')
     question = models.TextField(max_length=500, null=False, blank=False)
     explanation = models.TextField(max_length=500, null=True, blank=True)  # change to False for production
-
-    class Meta:
-        ordering = ['order']
 
 
 class QuizChoice(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     quiz = models.ForeignKey(QuizLessonStep, on_delete=models.CASCADE)
     text = models.CharField(max_length=100, null=False, blank=False)
-    correct = models.BooleanField(null=False, blank=False)
+    correct = models.BooleanField(null=False, blank=False, default=False)
 
     def __str__(self):
         return self.text
 
 
-class VideoLessonStep(BaseLessonStep):
+class VideoLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='video_step')
     title = models.CharField(max_length=150, null=True, blank=True)  # change to False
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
     ])  # change to False for production, add upload_to=...
-
-    class Meta:
-        ordering = ['order']
