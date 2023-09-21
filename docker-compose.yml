@@ -1,0 +1,45 @@
+version: '3.7'
+
+services:
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+
+  memcached:
+    image: memcached:latest
+    command: memcached -m 64
+    ports:
+      - "11211:11211"
+
+  web:
+    build: .
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  celery_worker:
+    build: .
+    command: ["celery", "-A", "courses_project", "worker", "--loglevel=info"]
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+#  celery_beat:
+#    build: .
+#    command: ["celery", "-A", "courses_project", "beat", "--loglevel=info"]
+#    volumes:
+#      - .:/app
+#    env_file:
+#      - .env
+#    depends_on:
+#      - redis
