@@ -159,3 +159,33 @@ class VideoLessonStep(models.Model):
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
     ])  # change to False for production, add upload_to=...
+
+
+class CodeChallengeLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='code_challenge_step')
+    title = models.CharField(max_length=100, null=False, blank=False)
+    description = models.TextField(null=True, blank=True)  # change to False for prod
+    initial_code = models.TextField(null=True, blank=True)  # change to False for prod
+    language = models.ForeignKey('courses.ProgrammingLanguage', on_delete=models.SET_NULL, null=True)
+    proposed_solution = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.title
+
+
+class ProgrammingLanguage(models.Model):
+    id = models.SmallIntegerField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return f'{self.id}: {self.name}'
+
+
+class CodeChallengeTestCase(models.Model):
+    id = models.SmallAutoField(primary_key=True, unique=True, editable=False)
+    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, on_delete=models.CASCADE, related_name='test_case')
+    input = models.TextField(null=False, blank=False)
+    expected_output = models.TextField(null=False, blank=False)
+
+    class Meta:
+        ordering = ['id']
