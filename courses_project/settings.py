@@ -214,3 +214,8 @@ CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
 # AWS_SECRET_ACCESS_KEY = 'HXNxeFt2M7qwr9VTDvMvQbEFblbLEB4jEKeDmLev'
 # AWS_STORAGE_BUCKET_NAME = 'devsearch-bucket-cc'
 
+
+# Judge0 variables
+JUDGE0_HOST = os.environ.get('JUDGE0_HOST')
+JUDGE0_AUTH_TOKEN = os.environ.get('JUDGE0_AUTH_TOKEN')
+JUDGE0_AUTH_USER = os.environ.get('JUDGE0_AUTH_USER')

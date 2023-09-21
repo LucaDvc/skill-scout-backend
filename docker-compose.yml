@@ -23,6 +23,7 @@ services:
       - .env
     depends_on:
       - redis
+      - memcached
 
   celery_worker:
     build: .
