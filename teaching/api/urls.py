@@ -1,12 +1,11 @@
 from django.urls import path
 from . import views
-from .views import VideoLessonStepListCreateView, VideoLessonStepRetrieveUpdateDestroyView
 
 urlpatterns = [
     path('courses/', views.CourseListCreateView.as_view(), name='course-list-create'),
     path('courses/<uuid:pk>/', views.CourseRetrieveUpdateDestroyView.as_view(), name='course-retrieve-update-destroy'),
 
-    path('courses/<uuid:course_id>/enrolled_learners/', views.CourseEnrolledLearnersView.as_view(),
+    path('courses/<uuid:course_id>/enrolled_learners/', views.CourseEnrolledLearnersListView.as_view(),
          name='course-enrolled-learners'),
 
     path('courses/<uuid:course_id>/chapters/', views.ChapterListCreateView.as_view(), name='chapter-list-create'),
@@ -31,9 +30,18 @@ urlpatterns = [
     path('quiz-choices/<uuid:pk>/', views.QuizChoiceRetrieveUpdateDestroyView.as_view(),
          name='quiz-choice-retrieve-update-destroy'),
 
-    path('lessons/<uuid:lesson_id>/video-steps/', VideoLessonStepListCreateView.as_view(),
+    path('lessons/<uuid:lesson_id>/video-steps/', views.VideoLessonStepListCreateView.as_view(),
          name='video-step-list-create'),
-    path('video-steps/<uuid:pk>/', VideoLessonStepRetrieveUpdateDestroyView.as_view(),
+    path('video-steps/<uuid:pk>/', views.VideoLessonStepRetrieveUpdateDestroyView.as_view(),
          name='video-step-retrieve-update-destroy'),
 
+    path('lessons/<uuid:lesson_id>/code-challenge-steps/', views.CodeChallengeLessonStepListCreateView.as_view(),
+         name='code-challenge-step-list-create'),
+    path('code-challenge-steps/<uuid:pk>/', views.CodeChallengeLessonStepRetrieveUpdateDestroyView.as_view(),
+         name='code-challenge-step-retrieve-update-destroy'),
+
+    path('code-challenge-steps/<uuid:code_challenge_id>/test_cases/', views.CodeChallengeTestCaseListCreateView.as_view(),
+         name='test-case-list-create'),
+    path('test_cases/<int:pk>/', views.CodeChallengeTestCaseRetrieveUpdateDestroyView.as_view(),
+         name='test-case-retrieve-update-destroy'),
 ]

@@ -1,10 +1,8 @@
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, MinLengthValidator, FileExtensionValidator
 from django.db import models
 import uuid
 from django.db.models import Avg
-
 from learning.models import CourseEnrollment
 from users.models import Instructor, Learner
 
@@ -183,7 +181,7 @@ class ProgrammingLanguage(models.Model):
 
 class CodeChallengeTestCase(models.Model):
     id = models.SmallAutoField(primary_key=True, unique=True, editable=False)
-    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, on_delete=models.CASCADE, related_name='test_case')
+    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, on_delete=models.CASCADE, related_name='test_cases')
     input = models.TextField(null=False, blank=False)
     expected_output = models.TextField(null=False, blank=False)
 

@@ -1,17 +1,21 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F
+from django.http import Http404
 from rest_framework import generics, status, serializers
 from rest_framework.generics import get_object_or_404
 from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from courses import cache_utils
 from learning.models import CourseEnrollment
 from users.models import Instructor
 from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
-    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer
+    QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CodeChallengeLessonStepSerializer, \
+    CodeChallengeTestCaseSerializer
 from .serializers import CourseEnrollmentSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep
+    BaseLessonStep, CodeChallengeLessonStep, CodeChallengeTestCase
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -146,10 +150,15 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 class BaseLessonStepListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
+    def validate_request_data(self, request):
+        pass
+
     def get_lesson(self):
         return get_object_or_404(Lesson, id=self.kwargs['lesson_id'], chapter__course__instructor__user=self.request.user)
 
     def perform_create(self, serializer):
+        self.validate_request_data(self.request)
+
         if 'order' in self.request.data:
             raise serializers.ValidationError(
                 {"order": "You cannot set the order value directly when creating a new lesson step."})
@@ -240,6 +249,7 @@ class QuizLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
 
 class QuizChoiceListCreateView(generics.ListCreateAPIView):
     serializer_class = QuizChoiceSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_quiz_step(self):
         quiz_id = self.kwargs['quiz_id']
@@ -257,6 +267,7 @@ class QuizChoiceListCreateView(generics.ListCreateAPIView):
 
 class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = QuizChoiceSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         quizzes = QuizLessonStep.objects.filter(base_step__lesson__chapter__course__instructor__user=self.request.user)
@@ -265,11 +276,6 @@ class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView)
     def get_object(self):
         pk = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=pk)
-
-    def perform_update(self, serializer):
-        quiz_choice = self.get_object()
-        quiz = quiz_choice.quiz
-        serializer.save(quiz=quiz)
 
 
 class VideoLessonStepListCreateView(BaseLessonStepListCreateView):
@@ -290,7 +296,90 @@ class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestr
         return VideoLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
-class CourseEnrolledLearnersView(generics.ListAPIView):
+class CodeChallengeLessonStepListCreateView(BaseLessonStepListCreateView):
+    serializer_class = CodeChallengeLessonStepSerializer
+
+    def get_queryset(self):
+        lesson_id = self.kwargs['lesson_id']
+        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor__user=self.request.user)
+        code_steps = CodeChallengeLessonStep.objects.filter(base_step__lesson=lesson)
+
+        # get the languages from the cache or fallback to the db if necessary
+        languages, from_cache = cache_utils.get_languages()
+
+        # fetch related languages from cache
+        if from_cache:
+            languages_dict = {lang.id: lang for lang in languages}
+            for step in code_steps:
+                if step.language_id in languages_dict:
+                    step.language = languages_dict[step.language_id]
+
+        return code_steps
+
+    def validate_request_data(self, request):
+        language_id = request.data.get('language_id')
+        try:
+            language, _ = cache_utils.get_language_by_id(language_id)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError({'error': 'Invalid language id'})
+
+
+class CodeChallengeLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestroyView):
+    serializer_class = CodeChallengeLessonStepSerializer
+
+    def get_queryset(self):
+        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        return CodeChallengeLessonStep.objects.filter(base_step__lesson__in=lessons)
+
+    def get_object(self):
+        pk = self.kwargs['pk']
+        code_step = get_object_or_404(self.get_queryset(), base_step__id=pk)
+
+        # fetch related language from cache
+        try:
+            language, from_cache = cache_utils.get_language_by_id(code_step.language_id)
+            code_step.language = language
+        except ObjectDoesNotExist:
+            return Response({'error': 'Invalid language id'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return code_step
+
+
+class CodeChallengeTestCaseListCreateView(generics.ListCreateAPIView):
+    serializer_class = CodeChallengeTestCaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_code_challenge(self):
+        code_challenge_id = self.kwargs['code_challenge_id']
+        return get_object_or_404(
+            CodeChallengeLessonStep,
+            base_step_id=code_challenge_id,
+            base_step__lesson__chapter__course__instructor__user=self.request.user
+        )
+
+    def get_queryset(self):
+        code_challenge = self.get_code_challenge()
+        return CodeChallengeTestCase.objects.filter(code_challenge_step=code_challenge)
+
+    def perform_create(self, serializer):
+        code_challenge = self.get_code_challenge()
+        serializer.save(code_challenge_step=code_challenge)
+
+
+class CodeChallengeTestCaseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CodeChallengeTestCaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        code_challenges = CodeChallengeLessonStep.objects.filter(base_step__lesson__chapter__course__instructor__user=self.request.user)
+        return CodeChallengeTestCase.objects.filter(code_challenge_step__in=code_challenges)
+
+    def get_object(self):
+        pk = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=pk)
+
+
+class CourseEnrolledLearnersListView(generics.ListAPIView):
     serializer_class = CourseEnrollmentSerializer
     permission_classes = [IsAuthenticated]
 

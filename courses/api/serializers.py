@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep
+    BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep
 from .mixins import LessonStepSerializerMixin
+from .. import cache_utils
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -64,7 +66,47 @@ class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
 class VideoLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     class Meta:
         model = VideoLessonStep
-        fields = ['id', 'order', 'title', 'video_file']
+        fields = ['id', 'type', 'order', 'title', 'video_file']
+
+
+class ProgrammingLanguageSerializer(BaseModelSerializer, LessonStepSerializerMixin):
+    class Meta:
+        model = ProgrammingLanguage
+        fields = ['id', 'name']
+
+
+class CodeChallengeTestCaseSerializer(BaseModelSerializer):
+    class Meta:
+        model = CodeChallengeTestCase
+        fields = ['id', 'input', 'expected_output']
+
+
+class CodeChallengeLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
+    language_id = serializers.IntegerField(source='language.id')
+    test_cases = CodeChallengeTestCaseSerializer(many=True, required=False)
+
+    class Meta:
+        model = CodeChallengeLessonStep
+        fields = ['id', 'type', 'order', 'title', 'description', 'language_id', 'initial_code', 'proposed_solution', 'test_cases']
+
+    def create(self, validated_data):
+        test_cases_data = validated_data.pop('test_cases', [])
+
+        language = validated_data.pop('language')
+        language_id = language['id']
+        validated_data['language'], _ = cache_utils.get_language_by_id(language_id)
+
+        code_lesson_step = CodeChallengeLessonStep.objects.create(**validated_data)
+
+        for test_case_data in test_cases_data:
+            CodeChallengeTestCase.objects.create(code_challenge_step=code_lesson_step, **test_case_data)
+
+        return code_lesson_step
+
+    def to_representation(self, obj):
+        representation = super().to_representation(obj)
+        representation['test_cases'] = CodeChallengeTestCaseSerializer(obj.test_cases.all(), many=True).data
+        return representation
 
 
 class LessonSerializer(BaseModelSerializer):
@@ -91,6 +133,8 @@ class LessonSerializer(BaseModelSerializer):
                 serialized_steps.append(QuizLessonStepSerializer(step.quiz_step).data)
             elif hasattr(step, 'video_step'):
                 serialized_steps.append(VideoLessonStepSerializer(step.video_step).data)
+            elif hasattr(step, 'code_challenge_step'):
+                serialized_steps.append(CodeChallengeLessonStepSerializer(step.code_challenge_step).data)
 
         ordered_steps = sorted(serialized_steps, key=lambda x: x['order'])
 
