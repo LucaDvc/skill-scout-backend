@@ -26,6 +26,7 @@ class Command(BaseCommand):
         languages_list = []
         for lang_data in languages:
             lang, created = ProgrammingLanguage.objects.get_or_create(id=lang_data['id'], name=lang_data['name'])
+            cache.set(f"programming_language_{lang.id}", lang, None)
             languages_list.append(lang)
 
         # cache the languages list indefinitely
