@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep
+    BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep, Category
 from .mixins import LessonStepSerializerMixin
 from .. import cache_utils
 from django.core.exceptions import ObjectDoesNotExist
@@ -158,16 +158,29 @@ class ChapterSerializer(BaseModelSerializer):
 class TagSerializer(BaseModelSerializer):
     class Meta:
         model = Tag
-        fields = '__all__'
+        fields = ['id', 'name']
+
+
+class CategorySerializer(BaseModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'supercategory']
+
+
+class CategoryField(serializers.PrimaryKeyRelatedField):
+    def to_representation(self, value):
+        category = Category.objects.get(pk=value.pk)
+        return CategorySerializer(category).data
 
 
 class CourseSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, required=False)
     chapters = serializers.SerializerMethodField()
+    category = CategoryField(queryset=Category.objects.all())
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'intro', 'description', 'requirements', 'total_hours', 'chapters',
+        fields = ['id', 'title', 'category', 'intro', 'description', 'requirements', 'total_hours', 'chapters',
                   'creation_date', 'release_date', 'price', 'image', 'tags', 'active']
 
     def update(self, instance, validated_data):

@@ -11,6 +11,7 @@ class Course(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)  # maybe change the on_delete behaviour
     title = models.CharField(max_length=100, null=False, blank=False)
+    category = models.ForeignKey('courses.Category', on_delete=models.SET_NULL, null=True, blank=True)
     intro = models.TextField(max_length=300, null=True, blank=True)  # change to False for production
     description = models.TextField(null=True, blank=True, validators=[
         MinLengthValidator(100, 'the description must be at least 100 characters long')
@@ -40,6 +41,15 @@ class Course(models.Model):
         return self.title
 
 
+class Category(models.Model):
+    id = models.SmallAutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    supercategory = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='subcategories')
+
+    def __str__(self):
+        return self.name
+
+
 class Review(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -62,7 +72,7 @@ class Review(models.Model):
 
 
 class Tag(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)  # change to models.SmallAutoField(primary_key=True)
     name = models.CharField(max_length=50, null=False, blank=False)
 
     def __str__(self):
