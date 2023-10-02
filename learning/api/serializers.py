@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from courses.api.serializers import CourseSerializer
-from learning.models import LearnerProgress
+from learning.models import LearnerProgress, CodeChallengeSubmission, TestResult
 
 
 class LearnerCourseSerializer(CourseSerializer):
@@ -23,3 +23,22 @@ class LearnerProgressSerializer(serializers.ModelSerializer):
         model = LearnerProgress
         fields = ['last_stopped_chapter', 'last_stopped_lesson', 'last_stopped_step',
                   'completed_chapters', 'completed_lessons', 'completed_steps', 'completion_ratio']
+
+
+class TestResultSerializer(serializers.ModelSerializer):
+    input = serializers.CharField(source='test_case.input', read_only=True)
+    expected_output = serializers.CharField(source='test_case.expected_output', read_only=True)
+
+    class Meta:
+        model = TestResult
+        fields = ['input', 'expected_output', 'stdout', 'stderr', 'compile_err', 'status', 'passed']
+
+
+class CodeChallengeSubmissionSerializer(serializers.ModelSerializer):
+    test_results = TestResultSerializer(many=True, read_only=True)
+    code_challenge_id = serializers.UUIDField(source='code_challenge_step.base_step.id', read_only=True)
+    learner_id = serializers.UUIDField(source='learner.id', read_only=True)
+
+    class Meta:
+        model = CodeChallengeSubmission
+        fields = ['code_challenge_id', 'learner_id', 'submitted_code', 'passed', 'error_message', 'test_results']

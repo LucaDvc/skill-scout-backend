@@ -10,3 +10,7 @@ admin.site.register(TextLessonStep)
 admin.site.register(QuizChoice)
 admin.site.register(QuizLessonStep)
 admin.site.register(VideoLessonStep)
+admin.site.register(CodeChallengeLessonStep)
+admin.site.register(CodeChallengeTestCase)
+admin.site.register(ProgrammingLanguage)
+

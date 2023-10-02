@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
@@ -13,7 +15,7 @@ class CourseEnrollment(models.Model):
     enrolled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [['course', 'learner']]
+        unique_together = ['course', 'learner']
 
     def __str__(self):
         return f'{self.course}: {self.learner}'
@@ -43,3 +45,34 @@ class LearnerProgress(models.Model):
 
     class Meta:
         unique_together = ['learner', 'course']
+
+
+class CodeChallengeSubmission(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
+    learner = models.ForeignKey('users.Learner', on_delete=models.CASCADE, related_name='code_challenge_submissions')
+    code_challenge_step = models.ForeignKey('courses.CodeChallengeLessonStep', on_delete=models.CASCADE, related_name='submissions')
+    submitted_code = models.TextField(null=True, blank=True)  # change to false
+    error_message = models.TextField(null=True, blank=True)
+    passed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ['learner', 'code_challenge_step']
+
+    def update_passed_status(self):
+        related_test_results = self.test_results.all()
+        all_passed = all(test_result.passed for test_result in related_test_results)
+        self.passed = all_passed
+        self.save()
+
+
+class TestResult(models.Model):
+    submission = models.ForeignKey('learning.CodeChallengeSubmission', models.CASCADE, related_name='test_results')
+    test_case = models.ForeignKey('courses.CodeChallengeTestCase', models.CASCADE)
+    status = models.CharField(max_length=55, null=True, blank=True)
+    compile_err = models.TextField(null=True, blank=True)
+    stderr = models.TextField(null=True, blank=True)
+    stdout = models.TextField(null=True, blank=True)
+    passed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ['submission', 'test_case']
