@@ -54,10 +54,11 @@ class ChapterListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
-        return Chapter.objects.filter(course__instructor__user=self.request.user, course__id=course_id)
+        course = get_object_or_404(Course, id=course_id)
+        return Chapter.objects.filter(course__instructor__user=self.request.user, course=course)
 
     def perform_create(self, serializer):
-        course = Course.objects.get(id=self.kwargs['course_id'], instructor__user=self.request.user)
+        course = get_object_or_404(Course, id=self.kwargs['course_id'], instructor__user=self.request.user)
         serializer.save(course=course)
 
 

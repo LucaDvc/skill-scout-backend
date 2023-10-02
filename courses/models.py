@@ -131,19 +131,19 @@ class BaseLessonStep(models.Model):
 
 
 class TextLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='text_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='text_step')
     text = models.TextField(null=True, blank=True)  # change to False for production
 
 
 class QuizLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='quiz_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='quiz_step')
     question = models.TextField(max_length=500, null=False, blank=False)
     explanation = models.TextField(max_length=500, null=True, blank=True)  # change to False for production
 
 
 class QuizChoice(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    quiz = models.ForeignKey(QuizLessonStep, on_delete=models.CASCADE)
+    quiz = models.ForeignKey(QuizLessonStep, to_field='base_step', on_delete=models.CASCADE)
     text = models.CharField(max_length=100, null=False, blank=False)
     correct = models.BooleanField(null=False, blank=False, default=False)
 
@@ -152,7 +152,7 @@ class QuizChoice(models.Model):
 
 
 class VideoLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='video_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='video_step')
     title = models.CharField(max_length=150, null=True, blank=True)  # change to False
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
@@ -160,7 +160,7 @@ class VideoLessonStep(models.Model):
 
 
 class CodeChallengeLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, related_name='code_challenge_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='code_challenge_step')
     title = models.CharField(max_length=100, null=False, blank=False)
     description = models.TextField(null=True, blank=True)  # change to False for prod
     initial_code = models.TextField(null=True, blank=True)  # change to False for prod
@@ -180,9 +180,9 @@ class ProgrammingLanguage(models.Model):
 
 
 class CodeChallengeTestCase(models.Model):
-    id = models.SmallAutoField(primary_key=True, unique=True, editable=False)
-    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, on_delete=models.CASCADE, related_name='test_cases')
-    input = models.TextField(null=False, blank=False)
+    id = models.AutoField(primary_key=True, unique=True, editable=False)
+    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, to_field='base_step', on_delete=models.CASCADE, related_name='test_cases')
+    input = models.TextField(null=False, blank=False, unique=True)
     expected_output = models.TextField(null=False, blank=False)
 
     class Meta:
