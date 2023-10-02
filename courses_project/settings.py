@@ -145,6 +145,7 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',
         'LOCATION': f"{os.environ.get('MEMCACHED_HOST')}:{os.environ.get('MEMCACHED_PORT')}",
+        'TIMEOUT': 2592000,  # 30 days
     }
 }
 

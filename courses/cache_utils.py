@@ -10,9 +10,9 @@ def reset_languages_cache():
         raise EmptyResultSet('The ProgrammingLanguage table is empty! Run populate_programming_languages command.')
 
     for lang in db_languages:
-        cache.set(f'programming_language_{lang.id}', lang, None)
+        cache.set(f'programming_language_{lang.id}', lang, timeout=None)
 
-    cache.set('programming_languages_list', db_languages, None)
+    cache.set('programming_languages_list', db_languages, timeout=None)
 
 
 def get_languages():
@@ -49,3 +49,10 @@ def get_language_by_id(lang_id):
         raise ObjectDoesNotExist(f'ProgrammingLanguage object with id {lang_id} not found!')
 
     return language, from_cache
+
+
+def cache_test(key):
+    obj = cache.get(key)
+    print(str(obj))
+    print(str(type(obj)))
+    print('tested cache')

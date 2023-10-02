@@ -26,10 +26,10 @@ class Command(BaseCommand):
         languages_list = []
         for lang_data in languages:
             lang, created = ProgrammingLanguage.objects.get_or_create(id=lang_data['id'], name=lang_data['name'])
-            cache.set(f"programming_language_{lang.id}", lang, None)
+            cache.set(f"programming_language_{lang.id}", lang, timeout=None)
             languages_list.append(lang)
 
         # cache the languages list indefinitely
-        cache.set("programming_languages_list", languages_list, None)
+        cache.set("programming_languages_list", languages_list, timeout=None)
 
         self.stdout.write(self.style.SUCCESS('ProgrammingLanguage table populated and cached successfully.'))
