@@ -3,6 +3,8 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
+
+from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +15,7 @@ from celery import states
 from django.core.cache import cache
 
 
-class LearnerCourseListView(generics.ListAPIView):
+class LearnerCourseListView(generics.ListAPIView, LearnerCourseViewMixin):
     serializer_class = LearnerCourseSerializer
     permission_classes = [IsAuthenticated]
 
@@ -22,7 +24,7 @@ class LearnerCourseListView(generics.ListAPIView):
         return Course.objects.filter(enrolled_learners__user=user)
 
 
-class LearnerCourseView(generics.RetrieveAPIView):
+class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
     serializer_class = LearnerCourseSerializer
     permission_classes = [IsAuthenticated]
 
@@ -100,12 +102,12 @@ def check_code_challenge_result(request, task_id):
             }
             return Response(response_data)
         elif result.status == states.FAILURE:
-            exception = result.result
+            exception_message = str(result.result) if result.result else "Unknown Error"
             response_data = {
                 'task_status': states.FAILURE,
-                'error': exception
+                'error': exception_message
             }
-            return Response(response_data)
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response({'status': states.PENDING})
 

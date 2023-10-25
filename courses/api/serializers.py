@@ -40,6 +40,14 @@ class QuizChoiceSerializer(BaseModelSerializer):
         model = QuizChoice
         fields = ['id', 'text', 'correct']
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # If the user is viewing the course as a learner, remove the 'correct' field from the response
+        if self.context.get('is_learner'):
+            representation.pop('correct', None)
+
+        return representation
+
 
 class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
     quiz_choices = QuizChoiceSerializer(many=True, required=False)
@@ -59,7 +67,7 @@ class QuizLessonStepSerializer(BaseModelSerializer, LessonStepSerializerMixin):
 
     def to_representation(self, obj):
         representation = super().to_representation(obj)
-        representation['quiz_choices'] = QuizChoiceSerializer(obj.quizchoice_set.all(), many=True).data
+        representation['quiz_choices'] = QuizChoiceSerializer(obj.quizchoice_set.all(), many=True, context=self.context).data
         return representation
 
 
@@ -106,7 +114,7 @@ class CodeChallengeLessonStepSerializer(BaseModelSerializer, LessonStepSerialize
 
     def to_representation(self, obj):
         representation = super().to_representation(obj)
-        representation['test_cases'] = CodeChallengeTestCaseSerializer(obj.test_cases.all(), many=True).data
+        representation['test_cases'] = CodeChallengeTestCaseSerializer(obj.test_cases.all(), many=True, context=self.context).data
         return representation
 
 
@@ -129,13 +137,13 @@ class LessonSerializer(BaseModelSerializer):
         serialized_steps = []
         for step in all_steps:
             if hasattr(step, 'text_step'):
-                serialized_steps.append(TextLessonStepSerializer(step.text_step).data)
+                serialized_steps.append(TextLessonStepSerializer(step.text_step, context=self.context).data)
             elif hasattr(step, 'quiz_step'):
-                serialized_steps.append(QuizLessonStepSerializer(step.quiz_step).data)
+                serialized_steps.append(QuizLessonStepSerializer(step.quiz_step, context=self.context).data)
             elif hasattr(step, 'video_step'):
-                serialized_steps.append(VideoLessonStepSerializer(step.video_step).data)
+                serialized_steps.append(VideoLessonStepSerializer(step.video_step, context=self.context).data)
             elif hasattr(step, 'code_challenge_step'):
-                serialized_steps.append(CodeChallengeLessonStepSerializer(step.code_challenge_step).data)
+                serialized_steps.append(CodeChallengeLessonStepSerializer(step.code_challenge_step, context=self.context).data)
 
         ordered_steps = sorted(serialized_steps, key=lambda x: x['order'])
 
@@ -153,7 +161,7 @@ class ChapterSerializer(BaseModelSerializer):
         fields = ['id', 'title', 'creation_date', 'lessons']
 
     def get_lessons(self, obj):
-        return LessonSerializer(obj.lesson_set.all(), many=True, required=False).data
+        return LessonSerializer(obj.lesson_set.all(), many=True, required=False, context=self.context).data
 
 
 class TagSerializer(BaseModelSerializer):
@@ -196,4 +204,4 @@ class CourseSerializer(BaseModelSerializer):
         return instance
 
     def get_chapters(self, obj):
-        return ChapterSerializer(obj.chapter_set.all(), many=True, required=False).data
+        return ChapterSerializer(obj.chapter_set.all(), many=True, required=False, context=self.context).data

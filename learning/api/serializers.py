@@ -44,7 +44,6 @@ class LearnerCourseSerializer(CourseSerializer):
             for lesson_rep in chapter_rep['lessons']:
                 lesson_rep['completed'] = UUID(lesson_rep['id']) in learner_progress.completed_lessons
                 for step_rep in lesson_rep['lesson_steps']:
-                    print(step_rep)
                     step_rep['completed'] = UUID(step_rep['id']) in learner_progress.completed_steps
 
         return rep
