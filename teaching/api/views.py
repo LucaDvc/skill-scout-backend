@@ -155,7 +155,8 @@ class BaseLessonStepListCreateView(generics.ListCreateAPIView):
         pass
 
     def get_lesson(self):
-        return get_object_or_404(Lesson, id=self.kwargs['lesson_id'], chapter__course__instructor__user=self.request.user)
+        return get_object_or_404(Lesson, id=self.kwargs['lesson_id'],
+                                 chapter__course__instructor__user=self.request.user)
 
     def perform_create(self, serializer):
         self.validate_request_data(self.request)
@@ -194,8 +195,8 @@ class BaseLessonStepRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIV
                 return
             elif new_order > len(all_lesson_steps):
                 raise serializers.ValidationError(
-                        {"order": "Order value cannot be bigger than the total number of lesson steps in the lesson"}
-                    )
+                    {"order": "Order value cannot be bigger than the total number of lesson steps in the lesson"}
+                )
             else:
                 if new_order > order:
                     affected_lesson_steps = list(
@@ -254,8 +255,13 @@ class QuizChoiceListCreateView(generics.ListCreateAPIView):
 
     def get_quiz_step(self):
         quiz_id = self.kwargs['quiz_id']
-        return QuizLessonStep.objects.get(base_step_id=quiz_id,
-                                          base_step__lesson__chapter__course__instructor__user=self.request.user)
+        try:
+            quiz = QuizLessonStep.objects.get(base_step_id=quiz_id,
+                                              base_step__lesson__chapter__course__instructor__user=self.request.user)
+        except QuizLessonStep.DoesNotExist:
+            raise Http404
+
+        return quiz
 
     def get_queryset(self):
         quiz = self.get_quiz_step()
@@ -372,7 +378,8 @@ class CodeChallengeTestCaseRetrieveUpdateDestroyView(generics.RetrieveUpdateDest
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        code_challenges = CodeChallengeLessonStep.objects.filter(base_step__lesson__chapter__course__instructor__user=self.request.user)
+        code_challenges = CodeChallengeLessonStep.objects.filter(
+            base_step__lesson__chapter__course__instructor__user=self.request.user)
         return CodeChallengeTestCase.objects.filter(code_challenge_step__in=code_challenges)
 
     def get_object(self):

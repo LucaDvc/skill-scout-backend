@@ -15,7 +15,7 @@ class Course(models.Model):
     intro = models.TextField(max_length=300, null=True, blank=True)  # change to False for production
     description = models.TextField(null=True, blank=True, validators=[
         MinLengthValidator(100, 'the description must be at least 100 characters long')
-    ])  # change to True for production
+    ])  # change to False for production
     requirements = models.TextField(null=True, blank=True)  # change to False for production
     total_hours = models.DecimalField(max_digits=3, decimal_places=0, null=True, blank=True)  # change to False for production
     creation_date = models.DateTimeField(auto_now_add=True, editable=False)
@@ -87,6 +87,9 @@ class Chapter(models.Model):
 
     def __str__(self):
         return self.title
+
+    class Meta:
+        ordering = ['creation_date']
 
 
 class Lesson(models.Model):

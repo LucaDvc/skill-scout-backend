@@ -87,7 +87,8 @@ class CodeChallengeLessonStepSerializer(BaseModelSerializer, LessonStepSerialize
 
     class Meta:
         model = CodeChallengeLessonStep
-        fields = ['id', 'type', 'order', 'title', 'description', 'language_id', 'initial_code', 'proposed_solution', 'test_cases']
+        fields = ['id', 'type', 'order', 'title', 'description', 'language_id', 'initial_code', 'proposed_solution',
+                  'test_cases']
 
     def create(self, validated_data):
         test_cases_data = validated_data.pop('test_cases', [])
@@ -176,7 +177,7 @@ class CategoryField(serializers.PrimaryKeyRelatedField):
 class CourseSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, required=False)
     chapters = serializers.SerializerMethodField()
-    category = CategoryField(queryset=Category.objects.all())
+    category = CategoryField(queryset=Category.objects.all())  # TODO cache categories
 
     class Meta:
         model = Course

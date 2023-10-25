@@ -2,6 +2,14 @@ from rest_framework import serializers
 
 from courses.api.serializers import CourseSerializer
 from learning.models import LearnerProgress, CodeChallengeSubmission, TestResult
+from uuid import UUID
+
+
+class LearnerProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearnerProgress
+        fields = ['last_stopped_chapter', 'last_stopped_lesson', 'last_stopped_step',
+                  'completed_chapters', 'completed_lessons', 'completed_steps', 'completion_ratio']
 
 
 class LearnerCourseSerializer(CourseSerializer):
@@ -10,19 +18,36 @@ class LearnerCourseSerializer(CourseSerializer):
     class Meta(CourseSerializer.Meta):
         fields = CourseSerializer.Meta.fields + ['learner_progress']
 
-    def get_learner_progress(self, obj):
-        learner_progress_list = self.context.get('learner_progress_list', [])
-        matching_progress = next((progress for progress in learner_progress_list if progress.course.id == obj.id), None)
-        if matching_progress:
-            return LearnerProgressSerializer(matching_progress).data
-        return None
+    def fetch_learner_progress(self, course):
+        user = self.context['request'].user
+        try:
+            learner_progress = LearnerProgress.objects.get(learner__user=user, course=course)
+        except LearnerProgress.DoesNotExist:
+            return None
 
+        return learner_progress
 
-class LearnerProgressSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LearnerProgress
-        fields = ['last_stopped_chapter', 'last_stopped_lesson', 'last_stopped_step',
-                  'completed_chapters', 'completed_lessons', 'completed_steps', 'completion_ratio']
+    def get_learner_progress(self, course):
+        learner_progress = self.fetch_learner_progress(course)
+        return LearnerProgressSerializer(learner_progress).data if learner_progress else None
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+
+        learner_progress = self.fetch_learner_progress(instance)
+        if not learner_progress:
+            return rep
+
+        # add 'completed' field to each child object and assign the values according to learner_progress
+        for chapter_rep in rep['chapters']:
+            chapter_rep['completed'] = UUID(chapter_rep['id']) in learner_progress.completed_chapters
+            for lesson_rep in chapter_rep['lessons']:
+                lesson_rep['completed'] = UUID(lesson_rep['id']) in learner_progress.completed_lessons
+                for step_rep in lesson_rep['lesson_steps']:
+                    print(step_rep)
+                    step_rep['completed'] = UUID(step_rep['id']) in learner_progress.completed_steps
+
+        return rep
 
 
 class TestResultSerializer(serializers.ModelSerializer):

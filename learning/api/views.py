@@ -3,8 +3,8 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-from .serializers import LearnerCourseSerializer, CodeChallengeSubmissionSerializer
-from courses.models import Course, CodeChallengeLessonStep
+from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
+from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep
 from rest_framework.permissions import IsAuthenticated
 
 from learning.models import LearnerProgress
@@ -21,19 +21,6 @@ class LearnerCourseListView(generics.ListAPIView):
         user = self.request.user
         return Course.objects.filter(enrolled_learners__user=user)
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-
-        user = self.request.user
-        courses = self.get_queryset()
-
-        learner_progress_list = LearnerProgress.objects.filter(learner__user=user, course__in=courses)
-
-        context.update({
-            'learner_progress_list': learner_progress_list
-        })
-        return context
-
 
 class LearnerCourseView(generics.RetrieveAPIView):
     serializer_class = LearnerCourseSerializer
@@ -46,18 +33,6 @@ class LearnerCourseView(generics.RetrieveAPIView):
     def get_object(self):
         course_id = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=course_id)
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-
-        learner = self.request.user
-
-        learner_progress = LearnerProgress.objects.filter(learner=learner, course=self.get_object())
-
-        context.update({
-            'learner_progress': learner_progress
-        })
-        return context
 
 
 @api_view(['POST'])
@@ -107,7 +82,6 @@ def submit_code_challenge(request, pk):
 @permission_classes([IsAuthenticated])
 def check_code_challenge_result(request, task_id):
     user = request.user
-    # TO DO CHANGE
     enrolled = CodeChallengeLessonStep.objects.filter(
         base_step__lesson__chapter__course__enrolled_learners__user=user
     ).exists()
@@ -134,3 +108,65 @@ def check_code_challenge_result(request, task_id):
             return Response(response_data)
     else:
         return Response({'status': states.PENDING})
+
+
+def get_next_step(lesson_step):
+    lesson = lesson_step.lesson
+    chapter = lesson_step.lesson.chapter
+    next_step = lesson.baselessonstep_set.filter(order=lesson_step.order + 1).first()
+    if not next_step:
+        next_lesson = chapter.lesson_set.filter(order=lesson.order + 1).first()
+        if next_lesson:
+            next_step = next_lesson.baselessonstep_set.first()
+    if not next_step:
+        course = chapter.course
+        next_chapter = course.chapter_set.filter(creation_date__gt=chapter.creation_date).first()
+        if next_chapter:
+            next_step = next_chapter.lesson_set.first().baselessonstep_set.first()
+        else:
+            next_step = lesson_step
+
+    return next_step
+
+
+@api_view(['POST'])
+def complete_lesson_step(request, step_id):
+    user = request.user
+
+    enrolled = BaseLessonStep.objects.filter(
+        lesson__chapter__course__enrolled_learners__user=user
+    ).exists()
+    if not enrolled:
+        return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        lesson_step = BaseLessonStep.objects.select_related('lesson__chapter').get(id=step_id)
+        lesson = lesson_step.lesson
+        chapter = lesson.chapter
+    except BaseLessonStep.DoesNotExist:
+        return Response({'detail': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
+
+    learner_progress, created = LearnerProgress.objects.get_or_create(course_id=chapter.course_id, learner=user.learner)
+    if lesson_step.id not in learner_progress.completed_steps:
+        learner_progress.completed_steps.append(lesson_step.id)
+        related_lesson_steps = lesson.baselessonstep_set.values_list('id', flat=True)
+        lesson_completed = set(related_lesson_steps).issubset(learner_progress.completed_steps)
+        if lesson_completed:
+            learner_progress.completed_lessons.append(lesson.id)
+            related_lessons = chapter.lesson_set.values_list('id', flat=True)
+            chapter_completed = set(related_lessons).issubset(learner_progress.completed_lessons)
+            if chapter_completed:
+                learner_progress.completed_chapters.append(chapter.id)
+
+        if learner_progress.completion_ratio != 100.0:
+            next_step = get_next_step(lesson_step)
+            if next_step:
+                learner_progress.last_stopped_step = next_step
+                learner_progress.last_stopped_lesson = next_step.lesson
+                learner_progress.last_stopped_chapter = next_step.lesson.chapter
+
+    learner_progress.save()
+
+    serializer = LearnerProgressSerializer(learner_progress)
+
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
