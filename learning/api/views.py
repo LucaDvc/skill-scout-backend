@@ -163,8 +163,6 @@ def submit_quiz(request, pk):
         return Response({'error': 'One or more quiz_choices are invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
     correct_choices = set(quiz_choices.filter(correct=True).values_list('id', flat=True))  # Correct choice UUIDs
-    print(correct_choices)
-    print(submitted_choices)
 
     is_correct = submitted_choices == correct_choices
 

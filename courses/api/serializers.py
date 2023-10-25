@@ -4,6 +4,7 @@ from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLes
 from .mixins import LessonStepSerializerMixin
 from .. import cache_utils
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.cache import cache
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -177,15 +178,25 @@ class CategorySerializer(BaseModelSerializer):
 
 
 class CategoryField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        cache_key = 'all_categories'
+        queryset = cache.get(cache_key)
+
+        if not queryset:
+            queryset = list(Category.objects.all())
+            cache.set(cache_key, queryset, 3600)  # cache for one hour
+
+        return queryset
+
     def to_representation(self, value):
-        category = Category.objects.get(pk=value.pk)
+        category = self.get_queryset().get(pk=value.pk)
         return CategorySerializer(category).data
 
 
 class CourseSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, required=False)
     chapters = serializers.SerializerMethodField()
-    category = CategoryField(queryset=Category.objects.all())  # TODO cache categories
+    category = CategoryField(queryset=Category.objects.all())
 
     class Meta:
         model = Course
