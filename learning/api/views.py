@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from celery.result import AsyncResult
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
@@ -6,7 +8,7 @@ from rest_framework.response import Response
 
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
-from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep
+from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep
 from rest_framework.permissions import IsAuthenticated
 
 from learning.models import LearnerProgress
@@ -129,6 +131,49 @@ def get_next_step(lesson_step):
             next_step = lesson_step
 
     return next_step
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_quiz(request, pk):
+    user = request.user
+    try:
+        quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
+            base_step_id=pk,
+            base_step__lesson__chapter__course__enrolled_learners__user=user
+        )
+    except QuizLessonStep.DoesNotExist:
+        return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    answer_ids = request.data.get('quiz_choices')
+    if not isinstance(answer_ids, list) or not answer_ids:
+        return Response({'error': 'quiz_choices must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Ensure all elements UUIDs
+    try:
+        submitted_choices = set(UUID(choice_id) for choice_id in answer_ids)
+    except (ValueError, AttributeError):
+        return Response({'error': 'All quiz_choices must be valid UUID strings'}, status=status.HTTP_400_BAD_REQUEST)
+
+    quiz_choices = quiz_step.quizchoice_set.all()
+
+    # Set of all valid choice UUIDs for this quiz
+    valid_choice_ids = {str(choice.id) for choice in quiz_choices}
+    if not all(choice_id in valid_choice_ids for choice_id in answer_ids):
+        return Response({'error': 'One or more quiz_choices are invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+    correct_choices = set(quiz_choices.filter(correct=True).values_list('id', flat=True))  # Correct choice UUIDs
+    print(correct_choices)
+    print(submitted_choices)
+
+    is_correct = submitted_choices == correct_choices
+
+    if is_correct:
+        response_data = {'detail': 'Correct answer'}
+    else:
+        response_data = {'detail': 'Incorrect answer'}
+
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
