@@ -8,11 +8,12 @@ from users.models import User, Instructor, Learner
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = '__all__'
+        fields = ['first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
+                  'personal_website', 'youtube']
 
 
 class InstructorSerializer(serializers.ModelSerializer):
-    user = UserSerializer(many=False)
+    user = UserSerializer(many=False, read_only=True)
 
     class Meta:
         model = Instructor
@@ -27,7 +28,7 @@ class SimpleCourseSerializer(serializers.ModelSerializer):
 
 class LearnerSerializer(serializers.ModelSerializer):
     wishlist = SimpleCourseSerializer(many=True, read_only=True)
-    user = UserSerializer(many=False)
+    user = UserSerializer(many=False, read_only=True)
 
     class Meta:
         model = Learner

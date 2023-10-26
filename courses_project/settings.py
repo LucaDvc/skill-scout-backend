@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'courses.apps.CoursesConfig',
     'users.apps.UsersConfig',
     'learning.apps.LearningConfig',
+    'catalog.apps.CatalogConfig',
 ]
 
 REST_FRAMEWORK = {
