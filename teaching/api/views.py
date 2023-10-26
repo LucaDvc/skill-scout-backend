@@ -397,3 +397,6 @@ class CourseEnrolledLearnersListView(generics.ListAPIView):
         course_id = self.kwargs['course_id']
         course = get_object_or_404(courses, id=course_id)
         return CourseEnrollment.objects.filter(course=course)
+
+
+# TODO: ENDPOINT TO PUBLISH COURSE, WITH VALIDATION OF THE USER PROFILE (CAN'T BE PRIVATE), OTHER VALIDATIONS

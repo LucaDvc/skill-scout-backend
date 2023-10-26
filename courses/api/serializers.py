@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep, Category
+    BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep, Category, Review
+from users.api.serializers import LearnerSerializer
 from .mixins import LessonStepSerializerMixin
 from .. import cache_utils
 from django.core.exceptions import ObjectDoesNotExist
@@ -171,6 +172,14 @@ class TagSerializer(BaseModelSerializer):
         fields = ['id', 'name']
 
 
+class ReviewSerializer(BaseModelSerializer):
+    learner = LearnerSerializer(many=False, read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ['id', 'learner', 'rating', 'comment', 'creation_date']
+
+
 class CategorySerializer(BaseModelSerializer):
     class Meta:
         model = Category
@@ -189,8 +198,20 @@ class CategoryField(serializers.PrimaryKeyRelatedField):
         return queryset
 
     def to_representation(self, value):
-        category = self.get_queryset().get(pk=value.pk)
-        return CategorySerializer(category).data
+        category = next((cat for cat in self.get_queryset() if cat.pk == value.pk), None)
+        if category is not None:
+            return CategorySerializer(category).data
+        return None
+
+    def to_internal_value(self, data):
+        queryset = self.get_queryset()
+
+        for instance in queryset:
+            if str(instance.pk) == str(data):
+                return instance
+
+        # if not found in the cache, raise a validation error
+        self.fail('does_not_exist', pk_value=data)
 
 
 class CourseSerializer(BaseModelSerializer):
