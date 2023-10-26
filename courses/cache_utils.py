@@ -1,6 +1,6 @@
 from django.core.cache import cache
 
-from courses.models import ProgrammingLanguage
+from courses.models import ProgrammingLanguage, Category
 from django.core.exceptions import EmptyResultSet, ObjectDoesNotExist
 
 
@@ -49,6 +49,17 @@ def get_language_by_id(lang_id):
         raise ObjectDoesNotExist(f'ProgrammingLanguage object with id {lang_id} not found!')
 
     return language, from_cache
+
+
+def get_categories():
+    cache_key = 'all_categories'
+    category_qs = cache.get(cache_key)
+
+    if not category_qs:
+        category_qs = list(Category.objects.all())
+        cache.set(cache_key, category_qs, 3600)  # cache for one hour
+
+    return category_qs
 
 
 def cache_test(key):

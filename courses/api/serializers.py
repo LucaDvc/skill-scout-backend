@@ -188,14 +188,7 @@ class CategorySerializer(BaseModelSerializer):
 
 class CategoryField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):
-        cache_key = 'all_categories'
-        queryset = cache.get(cache_key)
-
-        if not queryset:
-            queryset = list(Category.objects.all())
-            cache.set(cache_key, queryset, 3600)  # cache for one hour
-
-        return queryset
+        return cache_utils.get_categories()
 
     def to_representation(self, value):
         category = next((cat for cat in self.get_queryset() if cat.pk == value.pk), None)
