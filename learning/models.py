@@ -45,6 +45,9 @@ class LearnerProgress(models.Model):
     class Meta:
         unique_together = ['learner', 'course']
 
+    def __str__(self):
+        return f'{self.course}: {self.learner} - progress'
+
 
 class CodeChallengeSubmission(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
