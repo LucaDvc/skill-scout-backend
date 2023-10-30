@@ -5,10 +5,12 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
+from courses.api.serializers import ReviewSerializer
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
-from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep
+from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
 from rest_framework.permissions import IsAuthenticated
 
 from learning.models import LearnerProgress
@@ -215,3 +217,41 @@ def complete_lesson_step(request, step_id):
     serializer = LearnerProgressSerializer(learner_progress)
 
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ReviewListCreateView(generics.ListCreateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        course_id = self.kwargs['course_id']
+        course = get_object_or_404(Course, id=course_id)
+        return Review.objects.filter(course=course)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        course = get_object_or_404(Course, id=self.kwargs['course_id'])
+
+        if not course.enrolled_learners.filter(user_id=user.id).exists():
+            raise ValidationError({'error': 'to send a review, you must be enrolled in this course'})
+
+        if course.instructor.user == user:
+            raise ValidationError({'error': 'you cannot review your own course'})
+
+        learner_progress = LearnerProgress.objects.get(learner__user=user, course=course)
+        if learner_progress.completion_ratio < 80:
+            raise ValidationError({'error': 'to send a review, complete more than 80% of the course'})
+
+        serializer.save(course=course, learner=user.learner)
+
+
+class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Review.objects.filter(course__enrolled_learners__user=self.request.user)
+
+    def get_object(self):
+        review_id = self.kwargs['pk']
+        return get_object_or_404(self.get_queryset(), id=review_id)
