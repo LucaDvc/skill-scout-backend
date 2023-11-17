@@ -53,3 +53,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         user.save()
         return user
+
+
+class SetNewPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    token = serializers.CharField(write_only=True, required=True)
+    uidb64 = serializers.CharField(write_only=True, required=True)
