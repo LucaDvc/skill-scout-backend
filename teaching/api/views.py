@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from courses import cache_utils
 from learning.models import CourseEnrollment
-from users.models import Instructor
+from users.models import User
 from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
     QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CodeChallengeLessonStepSerializer, \
     CodeChallengeTestCaseSerializer
@@ -24,12 +24,12 @@ class CourseListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Course.objects.filter(instructor__user=user)
+        return Course.objects.filter(instructor=user)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            instructor = Instructor.objects.get(user=self.request.user)
+            instructor = User.objects.get(user=self.request.user)
             serializer.save(instructor=instructor)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -41,7 +41,7 @@ class CourseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Course.objects.filter(instructor__user=user)
+        return Course.objects.filter(instructor=user)
 
     def get_object(self):
         course_id = self.kwargs['pk']
@@ -55,10 +55,10 @@ class ChapterListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         course_id = self.kwargs['course_id']
         course = get_object_or_404(Course, id=course_id)
-        return Chapter.objects.filter(course__instructor__user=self.request.user, course=course)
+        return Chapter.objects.filter(course__instructor=self.request.user, course=course)
 
     def perform_create(self, serializer):
-        course = get_object_or_404(Course, id=self.kwargs['course_id'], instructor__user=self.request.user)
+        course = get_object_or_404(Course, id=self.kwargs['course_id'], instructor=self.request.user)
         serializer.save(course=course)
 
 
@@ -67,7 +67,7 @@ class ChapterRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Chapter.objects.filter(course__instructor__user=self.request.user)
+        return Chapter.objects.filter(course__instructor=self.request.user)
 
     def get_object(self):
         chapter_id = self.kwargs['pk']
@@ -80,13 +80,13 @@ class LessonListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         chapter_id = self.kwargs['chapter_id']
-        return Lesson.objects.filter(chapter__course__instructor__user=self.request.user, chapter__id=chapter_id)
+        return Lesson.objects.filter(chapter__course__instructor=self.request.user, chapter__id=chapter_id)
 
     def perform_create(self, serializer):
         if 'order' in self.request.data:
             raise serializers.ValidationError(
                 {"order": "You cannot set the order value directly when creating a new lesson."})
-        chapter = get_object_or_404(Chapter, id=self.kwargs['chapter_id'], course__instructor__user=self.request.user)
+        chapter = get_object_or_404(Chapter, id=self.kwargs['chapter_id'], course__instructor=self.request.user)
         last_lesson = Lesson.objects.filter(chapter=chapter).order_by('-order').first()
         highest_order = last_lesson.order if last_lesson else 0
         serializer.save(chapter=chapter, order=highest_order + 1)
@@ -97,7 +97,7 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        return Lesson.objects.filter(chapter__course__instructor=self.request.user)
 
     def get_object(self):
         lesson_id = self.kwargs['pk']
@@ -156,7 +156,7 @@ class BaseLessonStepListCreateView(generics.ListCreateAPIView):
 
     def get_lesson(self):
         return get_object_or_404(Lesson, id=self.kwargs['lesson_id'],
-                                 chapter__course__instructor__user=self.request.user)
+                                 chapter__course__instructor=self.request.user)
 
     def perform_create(self, serializer):
         self.validate_request_data(self.request)
@@ -229,7 +229,7 @@ class TextLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
     serializer_class = TextLessonStepSerializer
 
     def get_queryset(self):
-        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        lessons = Lesson.objects.filter(chapter__course__instructor=self.request.user)
         return TextLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
@@ -245,7 +245,7 @@ class QuizLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestro
     serializer_class = QuizLessonStepSerializer
 
     def get_queryset(self):
-        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        lessons = Lesson.objects.filter(chapter__course__instructor=self.request.user)
         return QuizLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
@@ -257,7 +257,7 @@ class QuizChoiceListCreateView(generics.ListCreateAPIView):
         quiz_id = self.kwargs['quiz_id']
         try:
             quiz = QuizLessonStep.objects.get(base_step_id=quiz_id,
-                                              base_step__lesson__chapter__course__instructor__user=self.request.user)
+                                              base_step__lesson__chapter__course__instructor=self.request.user)
         except QuizLessonStep.DoesNotExist:
             raise Http404
 
@@ -277,7 +277,7 @@ class QuizChoiceRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView)
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        quizzes = QuizLessonStep.objects.filter(base_step__lesson__chapter__course__instructor__user=self.request.user)
+        quizzes = QuizLessonStep.objects.filter(base_step__lesson__chapter__course__instructor=self.request.user)
         return QuizChoice.objects.filter(quiz__in=quizzes)
 
     def get_object(self):
@@ -291,7 +291,7 @@ class VideoLessonStepListCreateView(BaseLessonStepListCreateView):
 
     def get_queryset(self):
         lesson_id = self.kwargs['lesson_id']
-        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor__user=self.request.user)
+        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor=self.request.user)
         return VideoLessonStep.objects.filter(base_step__lesson=lesson)
 
 
@@ -299,7 +299,7 @@ class VideoLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpdateDestr
     serializer_class = VideoLessonStepSerializer
 
     def get_queryset(self):
-        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        lessons = Lesson.objects.filter(chapter__course__instructor=self.request.user)
         return VideoLessonStep.objects.filter(base_step__lesson__in=lessons)
 
 
@@ -308,7 +308,7 @@ class CodeChallengeLessonStepListCreateView(BaseLessonStepListCreateView):
 
     def get_queryset(self):
         lesson_id = self.kwargs['lesson_id']
-        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor__user=self.request.user)
+        lesson = get_object_or_404(Lesson, id=lesson_id, chapter__course__instructor=self.request.user)
         code_steps = CodeChallengeLessonStep.objects.filter(base_step__lesson=lesson)
 
         # get the languages from the cache or fallback to the db if necessary
@@ -335,7 +335,7 @@ class CodeChallengeLessonStepRetrieveUpdateDestroyView(BaseLessonStepRetrieveUpd
     serializer_class = CodeChallengeLessonStepSerializer
 
     def get_queryset(self):
-        lessons = Lesson.objects.filter(chapter__course__instructor__user=self.request.user)
+        lessons = Lesson.objects.filter(chapter__course__instructor=self.request.user)
         return CodeChallengeLessonStep.objects.filter(base_step__lesson__in=lessons)
 
     def get_object(self):
@@ -361,7 +361,7 @@ class CodeChallengeTestCaseListCreateView(generics.ListCreateAPIView):
         return get_object_or_404(
             CodeChallengeLessonStep,
             base_step_id=code_challenge_id,
-            base_step__lesson__chapter__course__instructor__user=self.request.user
+            base_step__lesson__chapter__course__instructor=self.request.user
         )
 
     def get_queryset(self):
@@ -379,7 +379,7 @@ class CodeChallengeTestCaseRetrieveUpdateDestroyView(generics.RetrieveUpdateDest
 
     def get_queryset(self):
         code_challenges = CodeChallengeLessonStep.objects.filter(
-            base_step__lesson__chapter__course__instructor__user=self.request.user)
+            base_step__lesson__chapter__course__instructor=self.request.user)
         return CodeChallengeTestCase.objects.filter(code_challenge_step__in=code_challenges)
 
     def get_object(self):
@@ -393,7 +393,7 @@ class CourseEnrolledLearnersListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        courses = Course.objects.filter(instructor__user=user)
+        courses = Course.objects.filter(instructor=user)
         course_id = self.kwargs['course_id']
         course = get_object_or_404(courses, id=course_id)
         return CourseEnrollment.objects.filter(course=course)

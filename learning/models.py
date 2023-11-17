@@ -7,7 +7,7 @@ from django.db import models
 
 class CourseEnrollment(models.Model):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
-    learner = models.ForeignKey('users.Learner', on_delete=models.CASCADE)
+    learner = models.ForeignKey('users.User', on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
     completed = models.BooleanField(default=False)
     favourite = models.BooleanField(default=False)
@@ -21,7 +21,7 @@ class CourseEnrollment(models.Model):
 
 
 class LearnerProgress(models.Model):
-    learner = models.ForeignKey('users.Learner', on_delete=models.CASCADE)
+    learner = models.ForeignKey('users.User', on_delete=models.CASCADE)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
     last_stopped_chapter = models.ForeignKey('courses.Chapter', on_delete=models.SET_NULL, null=True, blank=True)
     last_stopped_lesson = models.ForeignKey('courses.Lesson', on_delete=models.SET_NULL, null=True, blank=True)
@@ -51,7 +51,7 @@ class LearnerProgress(models.Model):
 
 class CodeChallengeSubmission(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    learner = models.ForeignKey('users.Learner', on_delete=models.CASCADE, related_name='code_challenge_submissions')
+    learner = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='code_challenge_submissions')
     code_challenge_step = models.ForeignKey('courses.CodeChallengeLessonStep', on_delete=models.CASCADE, related_name='submissions')
     submitted_code = models.TextField(null=True, blank=True)  # change to false
     error_message = models.TextField(null=True, blank=True)

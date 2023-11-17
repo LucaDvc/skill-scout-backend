@@ -4,12 +4,12 @@ from django.db import models
 import uuid
 from django.db.models import Avg
 from learning.models import CourseEnrollment
-from users.models import Instructor, Learner
+from users.models import User
 
 
 class Course(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)  # maybe change the on_delete behaviour
+    instructor = models.ForeignKey(User, on_delete=models.CASCADE)  # maybe change the on_delete behaviour
     title = models.CharField(max_length=100, null=False, blank=False)
     category = models.ForeignKey('courses.Category', on_delete=models.SET_NULL, null=True, blank=True)
     intro = models.TextField(max_length=300, null=True, blank=True)  # change to False for production
@@ -26,7 +26,7 @@ class Course(models.Model):
     image = models.ImageField(null=True, blank=True)  # add default
     tags = models.ManyToManyField('Tag', blank=True)
     active = models.BooleanField(default=False, null=False, blank=False)
-    enrolled_learners = models.ManyToManyField(Learner, through=CourseEnrollment, related_name='courses_enrolled')
+    enrolled_learners = models.ManyToManyField(User, through=CourseEnrollment, related_name='courses_enrolled')
 
     @property
     def average_rating(self):
@@ -53,7 +53,7 @@ class Category(models.Model):
 class Review(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    learner = models.ForeignKey(Learner, on_delete=models.CASCADE)
+    learner = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.IntegerField(null=False, blank=False, validators=[
         MinValueValidator(1),
         MaxValueValidator(5)

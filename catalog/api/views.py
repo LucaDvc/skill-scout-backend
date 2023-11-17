@@ -41,7 +41,7 @@ def course_enroll(request, pk):
     if not course.active:
         return Response({'error': 'enrollment is closed for this course'}, status=status.HTTP_400_BAD_REQUEST)
 
-    enrollment, created = CourseEnrollment.objects.get_or_create(course=course, learner=user.learner)
+    enrollment, created = CourseEnrollment.objects.get_or_create(course=course, learner=user)
     if not created:
         return Response({'error': 'learner already enrolled'}, status=status.HTTP_400_BAD_REQUEST)
     else:

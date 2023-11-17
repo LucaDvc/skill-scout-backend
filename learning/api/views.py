@@ -25,7 +25,7 @@ class LearnerCourseListView(generics.ListAPIView, LearnerCourseViewMixin):
 
     def get_queryset(self):
         user = self.request.user
-        return Course.objects.filter(enrolled_learners__user=user)
+        return Course.objects.filter(enrolled_learners=user)
 
 
 class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
@@ -63,13 +63,13 @@ def submit_code_challenge(request, pk):
             # Check if the user is the instructor for the course associated with this code challenge
             code_challenge_step = code_challenge_step.get(
                 base_step_id=pk,
-                base_step__lesson__chapter__course__instructor__user=user
+                base_step__lesson__chapter__course__instructor=user
             )
         else:
             # Check if the user is enrolled in the course associated with this code challenge
             code_challenge_step = code_challenge_step.get(
                 base_step_id=pk,
-                base_step__lesson__chapter__course__enrolled_learners__user=user
+                base_step__lesson__chapter__course__enrolled_learners=user
             )
 
     except CodeChallengeLessonStep.DoesNotExist:
@@ -79,7 +79,7 @@ def submit_code_challenge(request, pk):
     code_challenge_id = code_challenge_step.base_step_id
     cache.set(f'code_challenge_{code_challenge_id}', code_challenge_step, timeout=300)
     is_instructor = (acting_role == 'instructor')
-    task = evaluate_code.delay(code, code_challenge_id, user.learner.id, is_instructor)
+    task = evaluate_code.delay(code, code_challenge_id, user.id, is_instructor)
 
     return Response({"token": str(task.id)})
 
@@ -235,7 +235,7 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         if not course.enrolled_learners.filter(user_id=user.id).exists():
             raise ValidationError({'error': 'to send a review, you must be enrolled in this course'})
 
-        if course.instructor.user == user:
+        if course.instructor == user:
             raise ValidationError({'error': 'you cannot review your own course'})
 
         learner_progress = LearnerProgress.objects.get(learner__user=user, course=course)

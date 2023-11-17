@@ -21,7 +21,7 @@ class LearnerCourseSerializer(CourseSerializer):
     def fetch_learner_progress(self, course):
         user = self.context['request'].user
         try:
-            learner_progress = LearnerProgress.objects.get(learner__user=user, course=course)
+            learner_progress = LearnerProgress.objects.get(learner=user, course=course)
         except LearnerProgress.DoesNotExist:
             return None
 

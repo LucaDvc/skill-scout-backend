@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 
 from courses.models import Course
-from users.models import User, Instructor, Learner
+from users.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,14 +10,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
                   'personal_website', 'youtube']
-
-
-class InstructorSerializer(serializers.ModelSerializer):
-    user = UserSerializer(many=False, read_only=True)
-
-    class Meta:
-        model = Instructor
-        fields = '__all__'
 
 
 class SimpleCourseSerializer(serializers.ModelSerializer):
@@ -31,8 +23,8 @@ class LearnerSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
 
     class Meta:
-        model = Learner
-        fields = ['id', 'user', 'wishlist']
+        model = User
+        fields = ['id', 'wishlist']
 
 
 class RegisterSerializer(serializers.ModelSerializer):

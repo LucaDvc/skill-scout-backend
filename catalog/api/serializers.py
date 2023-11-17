@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from courses.api.serializers import TagSerializer, CategoryField, ReviewSerializer
 from courses.models import Course, Category, Chapter, Lesson
-from users.api.serializers import InstructorSerializer
+from users.api.serializers import UserSerializer
 
 
 class CatalogLessonSerializer(serializers.ModelSerializer):
@@ -24,7 +24,7 @@ class DetailedCatalogCourseSerializer(serializers.ModelSerializer):
     category = CategoryField(queryset=Category.objects.all())
     reviews = ReviewSerializer(many=True, read_only=True, source='review_set')
     enrolled_learners = serializers.SerializerMethodField()
-    instructor = InstructorSerializer(many=False, read_only=True)
+    instructor = UserSerializer(many=False, read_only=True)
     chapters = CatalogChaptersSerializer(many=True, read_only=True, source='chapter_set')
 
     class Meta:
@@ -40,7 +40,7 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     category = CategoryField(queryset=Category.objects.all())
     enrolled_learners = serializers.SerializerMethodField()
-    instructor = InstructorSerializer(many=False, read_only=True)
+    instructor = UserSerializer(many=False, read_only=True)
 
     class Meta:
         model = Course

@@ -42,9 +42,11 @@ class CustomUserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     # AbstractBaseUser has password, last_login and is_active by default
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
     email = models.EmailField(db_index=True, unique=True, max_length=255, null=False, blank=False, error_messages={
             "unique": "A user with that email already exists.",
         })
+    email_confirmed = models.BooleanField(default=False)
     first_name = models.CharField(max_length=50, null=False, blank=False)
     last_name = models.CharField(max_length=50, null=False, blank=False)
     city = models.CharField(max_length=255, null=True, blank=True)
@@ -56,6 +58,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     facebook = models.CharField(max_length=200, null=True, blank=True)
     personal_website = models.CharField(max_length=200, null=True, blank=True)
     youtube = models.CharField(max_length=200, null=True, blank=True)
+    enrolled_courses = models.ManyToManyField('courses.Course', through=CourseEnrollment,
+                                              related_name='learners_enrolled')
+    wishlist = models.ManyToManyField('courses.Course', related_name='wishlisted_by', blank=True)
 
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -69,21 +74,3 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
-
-
-class Instructor(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return self.user.__str__()
-
-
-class Learner(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    enrolled_courses = models.ManyToManyField('courses.Course', through=CourseEnrollment, related_name='learners_enrolled')
-    wishlist = models.ManyToManyField('courses.Course', related_name='wishlisted_by', blank=True)
-
-    def __str__(self):
-        return self.user.__str__()

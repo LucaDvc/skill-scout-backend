@@ -4,8 +4,6 @@ from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLes
 from users.api.serializers import LearnerSerializer
 from .mixins import LessonStepSerializerMixin
 from .. import cache_utils
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.cache import cache
 
 
 class BaseModelSerializer(serializers.ModelSerializer):

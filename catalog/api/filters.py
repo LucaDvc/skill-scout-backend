@@ -29,8 +29,8 @@ class MultiFieldSearchFilter(SearchFilter):
             query |= Q(intro__icontains=term)
             query |= Q(category__name__icontains=term)
             query |= Q(tags__name__icontains=term)
-            query |= Q(instructor__user__first_name__icontains=term)
-            query |= Q(instructor__user__last_name__icontains=term)
+            query |= Q(instructor__first_name__icontains=term)
+            query |= Q(instructor__last_name__icontains=term)
 
         return queryset.filter(query)
 
