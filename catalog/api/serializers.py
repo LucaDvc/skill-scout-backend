@@ -50,3 +50,14 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
     def get_enrolled_learners(self, obj):
         return obj.enrolled_learners.count()
 
+
+class CategoryListSerializer(serializers.ModelSerializer):
+    subcategories = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'subcategories']
+
+    def get_subcategories(self, instance):
+        subcategories = instance.subcategories.all()
+        return CategoryListSerializer(subcategories, many=True, context=self.context).data

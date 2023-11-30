@@ -8,8 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from catalog.api.filters import MultiFieldSearchFilter, CourseFilter
-from catalog.api.serializers import DetailedCatalogCourseSerializer, SimpleCatalogCourseSerializer
-from courses.models import Course
+from catalog.api.serializers import DetailedCatalogCourseSerializer, SimpleCatalogCourseSerializer, \
+    CategoryListSerializer
+from courses.models import Course, Category
 from learning.models import CourseEnrollment
 
 
@@ -48,3 +49,8 @@ def course_enroll(request, pk):
         return Response({}, status=status.HTTP_201_CREATED)
 
 # TODO: CATALOG HOME PAGE
+
+
+class CategoryListView(generics.ListAPIView):
+    queryset = Category.objects.filter(supercategory__isnull=True)  # Top-level categories only
+    serializer_class = CategoryListSerializer
