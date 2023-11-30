@@ -14,4 +14,6 @@ urlpatterns = [
 
     path('request-reset-email/', views.request_password_reset_email, name='request-reset-email'),
     path('reset-password/', views.set_new_password, name='request-reset-email'),
+
+    path('<uuid:pk>/', views.UserRetrieveUpdateDestroyView.as_view(), name='user-detail'),
 ]

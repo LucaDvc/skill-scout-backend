@@ -4,13 +4,15 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import smart_str, smart_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework.decorators import api_view
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from users.models import User
 from rest_framework.permissions import AllowAny
 
-from .serializers import RegisterSerializer, SetNewPasswordSerializer
+from .permissions import IsOwnerOrReadOnly
+from .serializers import RegisterSerializer, SetNewPasswordSerializer, UserSerializer
 from rest_framework import generics, status, serializers
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
@@ -89,7 +91,19 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         if user and not user.email_confirmed:
             return Response({'error': 'Email not confirmed'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        return super().post(request, *args, **kwargs)
+        token_response = super().post(request, *args, **kwargs)
+        token_data = token_response.data
+
+        # Serialize user profile
+        user_serializer = UserSerializer(instance=user)
+
+        # Add user profile data to token response
+        response_data = {
+            'user': user_serializer.data,
+            'tokens': token_data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -133,5 +147,14 @@ def set_new_password(request):
     except (User.DoesNotExist, ValueError, TypeError):
         return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 # TODO profile rud view (using UserSerializer)
-# TODO forgot password send email
+class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsOwnerOrReadOnly]
+    queryset = User.objects.all()
+
+    def get_object(self):
+        obj = super().get_object()
+        self.check_object_permissions(self.request, obj)
+        return obj
