@@ -8,7 +8,7 @@ from users.models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
+        fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
                   'personal_website', 'youtube']
 
 
