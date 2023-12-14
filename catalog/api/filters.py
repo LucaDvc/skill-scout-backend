@@ -38,7 +38,7 @@ class MultiFieldSearchFilter(SearchFilter):
 class CourseFilter(filters.FilterSet):
     average_rating__gte = NumberFilter(method='filter_average_rating_gte')
     average_rating__lte = NumberFilter(method='filter_average_rating_lte')
-    category = CharFilter(method='filter_by_category_name')
+    categories = CharFilter(method='filter_by_category_names')
 
     class Meta:
         model = Course
@@ -52,23 +52,28 @@ class CourseFilter(filters.FilterSet):
     def filter_average_rating_lte(self, queryset, name, value):
         return queryset.filter(avg_rating__lte=value)
 
-    def filter_by_category_name(self, queryset, name, value):
+    def filter_by_category_names(self, queryset, name, values):
         """
-        This filter first finds the category by name, then gets all courses
-        in that category or its subcategories.
+        This filter handles a list of category names and returns courses
+        in those categories or their subcategories. If no matching categories
+        are found, it returns an empty queryset.
         """
+        category_names = values.split(',')
         category_qs = cache_utils.get_categories()
 
-        supercategory = next((category for category in category_qs if category.name == value), None)
-        if not supercategory:
-            return queryset
+        supercategories = [category for category in category_qs if category.name in category_names]
 
-        subcategories = [category for category in category_qs if category.supercategory_id == supercategory.id]
+        if not supercategories:
+            return queryset.none()
 
-        # construct the OR conditions for the queryset
-        q_objects = Q(category=supercategory)
-        for subcategory in subcategories:
-            q_objects |= Q(category=subcategory)
+        q_objects = Q()
+        for supercategory in supercategories:
+            q_objects |= Q(category=supercategory)
+
+            # Include subcategories
+            subcategories = [category for category in category_qs if category.supercategory_id == supercategory.id]
+            for subcategory in subcategories:
+                q_objects |= Q(category=subcategory)
 
         return queryset.filter(q_objects)
 
