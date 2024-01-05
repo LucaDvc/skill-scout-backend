@@ -4,7 +4,6 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import smart_str, smart_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework.decorators import api_view
-from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -12,7 +11,7 @@ from users.models import User
 from rest_framework.permissions import AllowAny
 
 from .permissions import IsOwnerOrReadOnly
-from .serializers import RegisterSerializer, SetNewPasswordSerializer, UserSerializer
+from .serializers import RegisterSerializer, SetNewPasswordSerializer, DetailedProfileSerializer, UserSerializer
 from rest_framework import generics, status, serializers
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
@@ -148,13 +147,16 @@ def set_new_password(request):
         return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# TODO profile rud view (using UserSerializer)
 class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = UserSerializer
     permission_classes = [IsOwnerOrReadOnly]
     queryset = User.objects.all()
 
+    def get_serializer_class(self):
+        if self.request.user.is_authenticated and self.request.user.id == self.kwargs.get('pk'):
+            return UserSerializer
+        return DetailedProfileSerializer
+
     def get_object(self):
-        obj = super().get_object()
+        obj = generics.get_object_or_404(self.queryset, pk=self.kwargs.get('pk'))
         self.check_object_permissions(self.request, obj)
         return obj
