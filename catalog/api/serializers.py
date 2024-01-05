@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from courses.api.serializers import TagSerializer, CategoryField, ReviewSerializer
 from courses.models import Course, Category, Chapter, Lesson
-from users.api.serializers import UserSerializer
+from users.api.serializers import SimpleProfileSerializer
 
 
 class CatalogLessonSerializer(serializers.ModelSerializer):
@@ -24,7 +24,7 @@ class DetailedCatalogCourseSerializer(serializers.ModelSerializer):
     category = CategoryField(queryset=Category.objects.all())
     reviews = ReviewSerializer(many=True, read_only=True, source='review_set')
     enrolled_learners = serializers.SerializerMethodField()
-    instructor = UserSerializer(many=False, read_only=True)
+    instructor = SimpleProfileSerializer(many=False, read_only=True)
     chapters = CatalogChaptersSerializer(many=True, read_only=True, source='chapter_set')
 
     class Meta:
@@ -39,16 +39,15 @@ class DetailedCatalogCourseSerializer(serializers.ModelSerializer):
 class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     category = CategoryField(queryset=Category.objects.all())
-    enrolled_learners = serializers.SerializerMethodField()
-    instructor = UserSerializer(many=False, read_only=True)
+    instructor = SimpleProfileSerializer(many=False, read_only=True)
+    enrolled_learners = serializers.IntegerField(read_only=True, source='enrolled_learners_count')
+    average_rating = serializers.FloatField(read_only=True, source='avg_rating')
+    reviews_no = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'instructor', 'category', 'total_hours', 'price', 'image', 'tags', 'average_rating',
-                  'enrolled_learners']
-
-    def get_enrolled_learners(self, obj):
-        return obj.enrolled_learners.count()
+        fields = ['id', 'title', 'intro', 'instructor', 'category', 'total_hours', 'price', 'image', 'tags',
+                  'average_rating', 'enrolled_learners', 'reviews_no']
 
 
 class CategoryListSerializer(serializers.ModelSerializer):
@@ -56,7 +55,7 @@ class CategoryListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'subcategories']
+        fields = ['id', 'name', 'top', 'subcategories']
 
     def get_subcategories(self, instance):
         subcategories = instance.subcategories.all()
