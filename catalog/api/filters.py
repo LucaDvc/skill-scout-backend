@@ -39,6 +39,7 @@ class CourseFilter(filters.FilterSet):
     average_rating__gte = NumberFilter(method='filter_average_rating_gte')
     average_rating__lte = NumberFilter(method='filter_average_rating_lte')
     categories = CharFilter(method='filter_by_category_names')
+    tags = CharFilter(method='filter_by_tag_names')
 
     class Meta:
         model = Course
@@ -77,3 +78,6 @@ class CourseFilter(filters.FilterSet):
 
         return queryset.filter(q_objects)
 
+    def filter_by_tag_names(self, queryset, name, values):
+        tag_names = values.split(',')
+        return queryset.filter(tags__name__in=tag_names).distinct()
