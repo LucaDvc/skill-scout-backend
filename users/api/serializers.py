@@ -2,14 +2,41 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 
 from courses.models import Course
+from users.api.mixins import PrivacyMixin
 from users.models import User
+
+
+class SimpleProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'is_private']
+
+
+class ProfileCourseSerializer(serializers.ModelSerializer):
+    enrolled_learners = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Course
+        fields = ['id', 'title', 'total_hours', 'price', 'image', 'average_rating', 'enrolled_learners']
+
+    def get_enrolled_learners(self, obj):
+        return obj.enrolled_learners.count()
+
+
+class DetailedProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
+    courses = ProfileCourseSerializer(many=True, read_only=True, source='course_set')
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
+                  'personal_website', 'youtube', 'is_private', 'courses']
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
-                  'personal_website', 'youtube']
+                  'personal_website', 'youtube', 'is_private']
 
 
 class SimpleCourseSerializer(serializers.ModelSerializer):
@@ -20,11 +47,11 @@ class SimpleCourseSerializer(serializers.ModelSerializer):
 
 class LearnerSerializer(serializers.ModelSerializer):
     wishlist = SimpleCourseSerializer(many=True, read_only=True)
-    user = UserSerializer(many=False, read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'wishlist']
+        fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
+                  'personal_website', 'youtube', 'is_private', 'wishlist']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
