@@ -9,7 +9,7 @@ from users.models import User
 class SimpleProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'is_private']
+        fields = ['id', 'first_name', 'last_name', 'is_private', 'short_bio', 'picture']
 
 
 class ProfileCourseSerializer(serializers.ModelSerializer):
