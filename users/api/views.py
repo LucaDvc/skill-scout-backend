@@ -11,7 +11,8 @@ from users.models import User
 from rest_framework.permissions import AllowAny
 
 from .permissions import IsOwnerOrReadOnly
-from .serializers import RegisterSerializer, SetNewPasswordSerializer, DetailedProfileSerializer, UserSerializer
+from .serializers import RegisterSerializer, SetNewPasswordSerializer, DetailedProfileSerializer, UserSerializer, \
+    LearnerSerializer
 from rest_framework import generics, status, serializers
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
@@ -94,7 +95,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         token_data = token_response.data
 
         # Serialize user profile
-        user_serializer = UserSerializer(instance=user)
+        user_serializer = LearnerSerializer(instance=user)
 
         # Add user profile data to token response
         response_data = {
