@@ -214,7 +214,7 @@ class CourseSerializer(BaseModelSerializer):
     class Meta:
         model = Course
         fields = ['id', 'title', 'category', 'intro', 'description', 'requirements', 'total_hours', 'chapters',
-                  'creation_date', 'release_date', 'price', 'image', 'tags', 'active']
+                  'creation_date', 'release_date', 'price', 'image', 'tags', 'active', 'level']
 
     def update(self, instance, validated_data):
         tags_data = validated_data.pop('tags', [])

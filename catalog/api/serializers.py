@@ -26,11 +26,13 @@ class DetailedCatalogCourseSerializer(serializers.ModelSerializer):
     enrolled_learners = serializers.SerializerMethodField()
     instructor = SimpleProfileSerializer(many=False, read_only=True)
     chapters = CatalogChaptersSerializer(many=True, read_only=True, source='chapter_set')
+    level = serializers.CharField(source='get_level_display')
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'instructor', 'category', 'intro', 'description', 'requirements', 'total_hours',
-                  'release_date', 'price', 'image', 'tags', 'average_rating', 'reviews', 'enrolled_learners', 'chapters']
+        fields = ['id', 'title', 'instructor', 'category', 'intro', 'description', 'requirements', 'level',
+                  'total_hours', 'release_date', 'price', 'image', 'tags', 'average_rating', 'reviews',
+                  'enrolled_learners', 'chapters']
 
     def get_enrolled_learners(self, obj):
         return obj.enrolled_learners.count()
@@ -46,7 +48,7 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'intro', 'instructor', 'category', 'total_hours', 'price', 'image', 'tags',
+        fields = ['id', 'title', 'intro', 'instructor', 'category', 'level', 'total_hours', 'price', 'image', 'tags',
                   'average_rating', 'enrolled_learners', 'reviews_no']
 
 

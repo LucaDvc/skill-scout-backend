@@ -18,9 +18,9 @@ class Course(models.Model):
     ])  # change to False for production
 
     class DifficultyLevel(models.TextChoices):
-        OPTION_ONE = 1, 'Beginner'
-        OPTION_TWO = 2, 'Intermediate'
-        OPTION_THREE = 3, 'Advanced'
+        OPTION_ONE = '1', 'Beginner'
+        OPTION_TWO = '2', 'Intermediate'
+        OPTION_THREE = '3', 'Advanced'
 
     level = models.CharField(max_length=50, null=True, blank=True, choices=DifficultyLevel.choices)  # change to False for production
 
