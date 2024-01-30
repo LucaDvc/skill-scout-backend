@@ -210,16 +210,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
 
-# # S3 configuration
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-#
-# AWS_QUERYSTRING_AUTH = False
-# AWS_S3_FILE_OVERWRITE = False
-#
-# AWS_ACCESS_KEY_ID = 'AKIAQ2UDAD2NDVSFE45N'
-# AWS_SECRET_ACCESS_KEY = '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'
-# AWS_STORAGE_BUCKET_NAME = 'devsearch-bucket-cc'
+# S3 configuration
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_FILE_OVERWRITE = False
+
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 
 # Judge0 variables
 JUDGE0_HOST = os.environ.get('JUDGE0_HOST')

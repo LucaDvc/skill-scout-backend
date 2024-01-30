@@ -53,7 +53,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     short_bio = models.CharField(max_length=255, null=True, blank=True)
     about = models.TextField(null=True, blank=True)
     is_private = models.BooleanField(default=False, null=False, blank=False)
-    picture = models.ImageField(null=True, blank=True)
+    picture = models.ImageField(null=True, blank=True,
+                                upload_to='profiles/images/', default='profiles/images/user-default.png')
     linked_in = models.CharField(max_length=200, null=True, blank=True)
     facebook = models.CharField(max_length=200, null=True, blank=True)
     personal_website = models.CharField(max_length=200, null=True, blank=True)

@@ -31,7 +31,7 @@ class Course(models.Model):
     price = models.DecimalField(default=0, max_digits=4, decimal_places=0, null=True, blank=True, validators=[
         MinValueValidator(0)
     ])
-    image = models.ImageField(null=True, blank=True)  # add default
+    image = models.ImageField(null=True, blank=True, upload_to='courses/images/', default='courses/images/default.jpg')
     tags = models.ManyToManyField('Tag', blank=True)
     active = models.BooleanField(default=False, null=False, blank=False)
     enrolled_learners = models.ManyToManyField(User, through=CourseEnrollment, related_name='courses_enrolled')
@@ -178,7 +178,7 @@ class VideoLessonStep(models.Model):
     title = models.CharField(max_length=150, null=True, blank=True)  # change to False
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
-    ])  # change to False for production, add upload_to=...
+    ], upload_to='courses/videos/')  # change to False for production, add upload_to=...
 
 
 class CodeChallengeLessonStep(models.Model):
