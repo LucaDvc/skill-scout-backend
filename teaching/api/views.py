@@ -9,8 +9,8 @@ from rest_framework.response import Response
 
 from courses import cache_utils
 from learning.models import CourseEnrollment
-from users.models import User
-from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer, TextLessonStepSerializer, \
+from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonSerializer
+from courses.api.lesson_steps_serializers import TextLessonStepSerializer, \
     QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CodeChallengeLessonStepSerializer, \
     CodeChallengeTestCaseSerializer
 from .serializers import CourseEnrollmentSerializer

@@ -18,11 +18,15 @@ class Command(BaseCommand):
 
         # If not cached, fetch data from Judge0 API
         try:
+            self.stdout.write('Fetching the languages from Judge0 API... This may take a while.')
             languages = judge0_service.get_languages()
         except requests.HTTPError as e:
             self.stdout.write(self.style.ERROR(str(e)))
             return
 
+        self.stdout.write('Fetched languages from Judge0 API.')
+
+        self.stdout.write('Creating and caching the records...')
         languages_list = []
         for lang_data in languages:
             lang, created = ProgrammingLanguage.objects.get_or_create(id=lang_data['id'], name=lang_data['name'])

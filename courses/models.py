@@ -9,10 +9,10 @@ from users.models import User
 
 class Course(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, unique=True, editable=False)
-    instructor = models.ForeignKey(User, on_delete=models.CASCADE)  # maybe change the on_delete behaviour
+    instructor = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=100, null=False, blank=False)
     category = models.ForeignKey('courses.Category', on_delete=models.SET_NULL, null=True, blank=True)
-    intro = models.TextField(max_length=300, null=True, blank=True)  # change to False for production
+    intro = models.TextField(max_length=300, null=True, blank=True)
     description = models.TextField(null=True, blank=True, validators=[
         MinLengthValidator(100, 'the description must be at least 100 characters long')
     ])  # change to False for production
@@ -136,7 +136,8 @@ class BaseLessonStep(models.Model):
         ordering = ['order']
 
     def save(self, *args, **kwargs):
-        if hasattr(self, 'text_step') + hasattr(self, 'quiz_step') + hasattr(self, 'video_step') > 1:
+        if (hasattr(self, 'text_step') + hasattr(self, 'quiz_step')
+                + hasattr(self, 'video_step') + hasattr(self, 'code_challenge_step') > 1):
             raise ValidationError('A BaseLessonStep can only have one type of child step.')
         super().save(*args, **kwargs)
 
@@ -203,9 +204,11 @@ class ProgrammingLanguage(models.Model):
 
 class CodeChallengeTestCase(models.Model):
     id = models.AutoField(primary_key=True, unique=True, editable=False)
-    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, to_field='base_step', on_delete=models.CASCADE, related_name='test_cases')
-    input = models.TextField(null=False, blank=False, unique=True)
+    code_challenge_step = models.ForeignKey(CodeChallengeLessonStep, to_field='base_step', on_delete=models.CASCADE,
+                                            related_name='test_cases')
+    input = models.TextField(null=False, blank=False)
     expected_output = models.TextField(null=False, blank=False)
 
     class Meta:
         ordering = ['id']
+        unique_together = ['code_challenge_step', 'input']
