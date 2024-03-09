@@ -34,7 +34,7 @@ class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
 
     def get_queryset(self):
         user = self.request.user
-        return Course.objects.filter(enrolled_learners__user=user)
+        return Course.objects.filter(enrolled_learners=user)
 
     def get_object(self):
         course_id = self.kwargs['pk']
@@ -89,7 +89,7 @@ def submit_code_challenge(request, pk):
 def check_code_challenge_result(request, task_id):
     user = request.user
     enrolled = CodeChallengeLessonStep.objects.filter(
-        base_step__lesson__chapter__course__enrolled_learners__user=user
+        base_step__lesson__chapter__course__enrolled_learners=user
     ).exists()
     if not enrolled:
         return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
@@ -142,7 +142,7 @@ def submit_quiz(request, pk):
     try:
         quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
             base_step_id=pk,
-            base_step__lesson__chapter__course__enrolled_learners__user=user
+            base_step__lesson__chapter__course__enrolled_learners=user
         )
     except QuizLessonStep.DoesNotExist:
         return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -181,7 +181,7 @@ def complete_lesson_step(request, step_id):
     user = request.user
 
     enrolled = BaseLessonStep.objects.filter(
-        lesson__chapter__course__enrolled_learners__user=user
+        lesson__chapter__course__enrolled_learners=user
     ).exists()
     if not enrolled:
         return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
@@ -193,7 +193,7 @@ def complete_lesson_step(request, step_id):
     except BaseLessonStep.DoesNotExist:
         return Response({'detail': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
-    learner_progress, created = LearnerProgress.objects.get_or_create(course_id=chapter.course_id, learner=user.learner)
+    learner_progress, created = LearnerProgress.objects.get_or_create(course_id=chapter.course_id, learner=user)
     if lesson_step.id not in learner_progress.completed_steps:
         learner_progress.completed_steps.append(lesson_step.id)
         related_lesson_steps = lesson.baselessonstep_set.values_list('id', flat=True)
@@ -238,11 +238,11 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         if course.instructor == user:
             raise ValidationError({'error': 'you cannot review your own course'})
 
-        learner_progress = LearnerProgress.objects.get(learner__user=user, course=course)
+        learner_progress = LearnerProgress.objects.get(learner=user, course=course)
         if learner_progress.completion_ratio < 80:
             raise ValidationError({'error': 'to send a review, complete more than 80% of the course'})
 
-        serializer.save(course=course, learner=user.learner)
+        serializer.save(course=course, learner=user)
 
 
 class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -250,7 +250,7 @@ class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Review.objects.filter(course__enrolled_learners__user=self.request.user)
+        return Review.objects.filter(course__enrolled_learners=self.request.user)
 
     def get_object(self):
         review_id = self.kwargs['pk']
