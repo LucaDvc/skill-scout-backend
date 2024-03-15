@@ -68,9 +68,34 @@ def course_enroll(request, pk):
         return Response({'error': 'enrollment is closed for this course'}, status=status.HTTP_400_BAD_REQUEST)
 
     enrollment, created = CourseEnrollment.objects.get_or_create(course=course, learner=user)
+
+    if course in user.wishlist.all():
+        user.wishlist.remove(course)
+
     if not created:
         return Response({'error': 'learner already enrolled'}, status=status.HTTP_400_BAD_REQUEST)
     else:
+        return Response({}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def course_wishlist(request, pk):
+    """
+        Add or remove a course from the user's wishlist
+    """
+    user = request.user
+
+    course = get_object_or_404(Course, id=pk)
+
+    if not course.active:
+        return Response({'error': 'course is inactive'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if course in user.wishlist.all():
+        user.wishlist.remove(course)
+        return Response({}, status=status.HTTP_200_OK)
+    else:
+        user.wishlist.add(course)
         return Response({}, status=status.HTTP_201_CREATED)
 
 
