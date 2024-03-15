@@ -95,7 +95,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         token_data = token_response.data
 
         # Serialize user profile
-        user_serializer = LearnerSerializer(instance=user)
+        user_serializer = UserSerializer(instance=user)
 
         # Add user profile data to token response
         response_data = {

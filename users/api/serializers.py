@@ -32,17 +32,20 @@ class DetailedProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
                   'personal_website', 'youtube', 'is_private', 'courses']
 
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
-                  'personal_website', 'youtube', 'is_private']
-
-
 class SimpleCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ['id', 'title']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    wishlist = SimpleCourseSerializer(many=True, read_only=True)
+    enrolled_courses = SimpleCourseSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
+                  'personal_website', 'youtube', 'is_private', 'wishlist', 'enrolled_courses']
 
 
 class LearnerSerializer(serializers.ModelSerializer):
