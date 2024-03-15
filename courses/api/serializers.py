@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from django.db import transaction
 from rest_framework import serializers
@@ -44,6 +45,13 @@ class LessonSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
 
         return lesson
 
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            lesson_steps_data = validated_data.pop('baselessonstep_set', [])
+            instance = super().update(instance, validated_data)
+
+        return instance
+
     def get_chapter_id(self, obj):
         return obj.chapter.id
 
@@ -66,6 +74,28 @@ class ChapterSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin)
                     lesson_serializer.save(chapter=chapter, baselessonstep_set=lesson_steps)
 
         return chapter
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            lessons_data = validated_data.pop('lessons', [])
+            instance = super().update(instance, validated_data)
+            lessons_ids_to_keep = []
+            for lesson_data in lessons_data:
+                try:
+                    UUID(lesson_data['id'])
+                except ValueError:
+                    lesson_data.pop('id', None)
+                    lesson_serializer = LessonSerializer(data=lesson_data)
+                else:
+                    lesson = Lesson.objects.get(id=lesson_data['id'])
+                    lesson_serializer = LessonSerializer(lesson, data=lesson_data, partial=True)
+
+                if lesson_serializer.is_valid(raise_exception=True):
+                    lesson_instance = lesson_serializer.save(chapter=instance)
+                    lessons_ids_to_keep.append(lesson_instance.id)
+            instance.lesson_set.exclude(id__in=lessons_ids_to_keep).delete()
+
+        return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -117,7 +147,7 @@ class CategoryField(serializers.PrimaryKeyRelatedField):
 class CourseSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
     tags = TagSerializer(many=True, required=False)
     chapters = ChapterSerializer(many=True, required=False)
-    category = CategoryField(queryset=Category.objects.all())
+    category = CategoryField(queryset=Category.objects.all(), required=False)
     image = ImageOrUrlField(required=False, allow_null=True)
 
     class Meta:
@@ -132,12 +162,41 @@ class CourseSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
 
     def update(self, instance, validated_data):
         tags_data = validated_data.pop('tags', [])
+        chapters_data = validated_data.pop('chapters', [])
 
         instance = super().update(instance, validated_data)
 
-        for tag_data in tags_data:
-            tag, created = Tag.objects.get_or_create(name=tag_data['name'])
-            instance.tags.add(tag)
+        if tags_data:
+            tags = []
+            for tag_data in tags_data:
+                tag, created = Tag.objects.get_or_create(name=tag_data['name'])
+                tags.append(tag)
+
+            instance.tags.set(tags)
+
+        if chapters_data:
+            chapters_ids_to_keep = []
+            with transaction.atomic():
+                for chapter_data in chapters_data:
+                    try:
+                        UUID(chapter_data['id'])
+                    except ValueError:
+                        chapter_data.pop('id', None)
+                        chapter_serializer = ChapterSerializer(data=chapter_data)
+                    else:
+                        try:
+                            chapter = Chapter.objects.get(id=chapter_data['id'])
+                        except Chapter.DoesNotExist:
+                            raise serializers.ValidationError({'chapter': f'Chapter with id {chapter_data["id"]} does not exist.'})
+                        chapter_serializer = ChapterSerializer(chapter, data=chapter_data, partial=True)
+
+                    if chapter_serializer.is_valid(raise_exception=True):
+                        lessons = chapter_data.pop('lessons', [])
+                        chapter_instance = chapter_serializer.save(course=instance, lessons=lessons)
+                        chapters_ids_to_keep.append(chapter_instance.id)
+
+                # Delete chapters not in chapters_ids_to_keep
+                instance.chapter_set.exclude(id__in=chapters_ids_to_keep).delete()
 
         return instance
 
@@ -149,8 +208,9 @@ class CourseSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
         with transaction.atomic():
             course = Course.objects.create(**validated_data)
 
-            existing_tags = Tag.objects.filter(name__in=tag_names)
-            course.tags.set(existing_tags)
+            for tag_name in tag_names:
+                tag, created = Tag.objects.get_or_create(name=tag_name)
+                course.tags.add(tag)
 
             for chapter_data in chapters_data:
                 chapter_serializer = ChapterSerializer(data=chapter_data)
