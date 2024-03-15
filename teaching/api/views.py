@@ -1,3 +1,5 @@
+import json
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F
 from django.http import Http404
@@ -6,6 +8,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django_filters import rest_framework as filters
 
 from courses import cache_utils
 from learning.models import CourseEnrollment
@@ -21,6 +24,8 @@ from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonSt
 class CourseListCreateView(generics.ListCreateAPIView):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.DjangoFilterBackend]
+    filterset_fields = ['active']
 
     def get_queryset(self):
         user = self.request.user
@@ -46,6 +51,23 @@ class CourseRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         course_id = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=course_id)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Parse tags if they are a string
+        tags_data = request.data.get('tags')
+        if isinstance(tags_data, str):
+            try:
+                tags_data = json.loads(tags_data)
+            except json.JSONDecodeError:
+                return Response({'detail': 'Invalid JSON format for tags'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.serializer_class(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(tags=tags_data, chapters=request.data.get('chapters'))
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ChapterListCreateView(generics.ListCreateAPIView):
