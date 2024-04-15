@@ -1,4 +1,5 @@
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Value, F
+from django.db.models.functions import Coalesce
 from django_filters import rest_framework as filters
 
 from rest_framework import generics, status
@@ -17,33 +18,47 @@ from courses.models import Course, Category, Tag
 from learning.models import CourseEnrollment
 
 
-class CatalogCourseListView(generics.ListAPIView):
+class BaseCatalogCourseListView(generics.ListAPIView):
     serializer_class = SimpleCatalogCourseSerializer
-    ordering_fields = ['avg_rating,', 'title', 'price', 'enrolled_learners', 'reviews_no']
+    ordering_fields = ['avg_rating', 'title', 'price', 'enrolled_learners', 'reviews_no']
     filter_backends = [MultiFieldSearchFilter, filters.DjangoFilterBackend, OrderingFilter]
     filterset_class = CourseFilter
     pagination_class = type('StandardPagination', (PageNumberPagination,), {'page_size': 20})
 
     def get_queryset(self):
         return (Course.objects.filter(active=True)
-                .annotate(avg_rating=Avg('review__rating'))
+                .annotate(avg_rating=Coalesce(Avg('review__rating'), Value(0.0)))
                 .annotate(enrolled_learners_count=Count('enrolled_learners'))
                 .annotate(reviews_no=Count('review')))
 
     def filter_queryset(self, queryset):
         ordering = self.request.query_params.get("ordering", "")
-
-        if ordering in ['avg_rating', '-avg_rating']:
-            queryset = super().filter_queryset(queryset.order_by(ordering))
-        elif ordering in ['enrolled_learners', '-enrolled_learners']:
-            queryset = super().filter_queryset(queryset.order_by(f'{ordering}_count'))
-        elif ordering in ['reviews_no', '-reviews_no']:
-            queryset = super().filter_queryset(queryset.order_by(ordering))
+        ordering_fields = ['avg_rating', 'title', 'price', 'enrolled_learners_count', 'reviews_no']
+        # Check if ordering is requested on a valid field
+        if ordering.lstrip('-') in ordering_fields:
+            # Determine if we are ordering in ascending or descending order
+            if ordering.startswith('-'):
+                field_name = ordering.lstrip('-')
+                # For fields that may have null values, specify nulls_last=True for descending order
+                queryset = queryset.order_by(F(field_name).desc(nulls_last=True))
+            else:
+                field_name = ordering
+                # For fields that may have null values, specify nulls_first=True for ascending order
+                queryset = queryset.order_by(F(field_name).asc(nulls_first=True))
         else:
             # Apply default filtering and ordering
             queryset = super().filter_queryset(queryset)
 
         return queryset
+
+
+class WebCatalogCourseListView(BaseCatalogCourseListView):
+    serializer_class = SimpleCatalogCourseSerializer
+
+
+class MobileCatalogCourseListView(BaseCatalogCourseListView):
+    serializer_class = DetailedCatalogCourseSerializer
+    pagination_class = type('MobilePagination', (PageNumberPagination,), {'page_size': 10})
 
 
 class CatalogCourseView(generics.RetrieveAPIView):
