@@ -45,11 +45,19 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
     enrolled_learners = serializers.IntegerField(read_only=True, source='enrolled_learners_count')
     average_rating = serializers.FloatField(read_only=True, source='avg_rating')
     reviews_no = serializers.IntegerField(read_only=True)
+    is_enrolled = serializers.SerializerMethodField(method_name='get_is_enrolled')
 
     class Meta:
         model = Course
         fields = ['id', 'title', 'intro', 'instructor', 'category', 'level', 'total_hours', 'price', 'image', 'tags',
-                  'average_rating', 'enrolled_learners', 'reviews_no']
+                  'average_rating', 'enrolled_learners', 'reviews_no', 'is_enrolled']
+
+    def get_is_enrolled(self, obj):
+        user = self.context['request'].user
+        if not user.is_authenticated:
+            return False
+        else:
+            return obj.enrolled_learners.filter(id=user.id).exists()
 
 
 class CategoryListSerializer(serializers.ModelSerializer):
