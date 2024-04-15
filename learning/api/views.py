@@ -232,7 +232,7 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         user = self.request.user
         course = get_object_or_404(Course, id=self.kwargs['course_id'])
 
-        if not course.enrolled_learners.filter(user_id=user.id).exists():
+        if not course.enrolled_learners.filter(id=user.id).exists():
             raise ValidationError({'error': 'to send a review, you must be enrolled in this course'})
 
         if course.instructor == user:
