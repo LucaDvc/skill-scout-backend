@@ -32,12 +32,8 @@ class BaseCatalogCourseListView(generics.ListAPIView):
 
     def filter_queryset(self, queryset):
         ordering = self.request.query_params.get("ordering", "")
-        print(queryset)
-        for course in queryset:
-            for user in course.enrolled_learners.all():
-                print(user)
-            print(course.enrolled_learners_count)
-        ordering = 'enrolled_learners_count' if ordering.lstrip('-') == 'enrolled_learners' else ordering
+        if ordering.lstrip('-') == 'enrolled_learners':
+            ordering = '-enrolled_learners_count' if ordering.startswith('-') else 'enrolled_learners_count'
         ordering_fields = ['avg_rating', 'title', 'price', 'enrolled_learners_count', 'reviews_no']
         # Check if ordering is requested on a valid field
         if ordering.lstrip('-') in ordering_fields:
