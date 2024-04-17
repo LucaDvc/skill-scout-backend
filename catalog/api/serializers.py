@@ -29,39 +29,15 @@ class DetailedCatalogCourseSerializer(serializers.ModelSerializer):
     instructor = SimpleProfileSerializer(many=False, read_only=True)
     chapters = CatalogChaptersSerializer(many=True, read_only=True, source='chapter_set')
     level = serializers.CharField(source='get_level_display')
-    is_enrolled = serializers.SerializerMethodField(method_name='get_is_enrolled')
-    learner_progress = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
         fields = ['id', 'title', 'instructor', 'category', 'intro', 'description', 'requirements', 'level',
                   'total_hours', 'release_date', 'price', 'image', 'tags', 'average_rating', 'reviews',
-                  'enrolled_learners', 'chapters', 'is_enrolled', 'learner_progress']
+                  'enrolled_learners', 'chapters']
 
     def get_enrolled_learners(self, obj):
         return obj.enrolled_learners.count()
-
-    def get_is_enrolled(self, obj):
-        user = self.context['request'].user
-        if not user.is_authenticated:
-            return False
-        else:
-            return obj.enrolled_learners.filter(id=user.id).exists()
-
-    def fetch_learner_progress(self, course):
-        user = self.context['request'].user
-        learner_progress = None
-        if user.is_authenticated:
-            try:
-                learner_progress = LearnerProgress.objects.get(learner=user, course=course)
-            except LearnerProgress.DoesNotExist:
-                return None
-
-        return learner_progress
-
-    def get_learner_progress(self, course):
-        learner_progress = self.fetch_learner_progress(course)
-        return LearnerProgressSerializer(learner_progress).data if learner_progress else None
 
 
 class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
@@ -79,6 +55,36 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
                   'average_rating', 'enrolled_learners', 'reviews_no']
 
 
+class MobileCatalogCourseSerializer(SimpleCatalogCourseSerializer):
+    is_enrolled = serializers.SerializerMethodField()
+    learner_progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = SimpleCatalogCourseSerializer.Meta.fields + ['is_enrolled', 'learner_progress']
+
+
+    def get_is_enrolled(self, course):
+        user = self.context['request'].user
+        if not user.is_authenticated:
+            return False
+        else:
+            return course.enrolled_learners.filter(id=user.id).exists()
+
+    def fetch_learner_progress(self, course):
+        user = self.context['request'].user
+        learner_progress = None
+        if user.is_authenticated:
+            try:
+                learner_progress = LearnerProgress.objects.get(learner=user, course=course)
+            except LearnerProgress.DoesNotExist:
+                return None
+
+        return learner_progress
+
+    def get_learner_progress(self, course):
+        learner_progress = self.fetch_learner_progress(course)
+        return LearnerProgressSerializer(learner_progress).data if learner_progress else None
 
 
 class CategoryListSerializer(serializers.ModelSerializer):
