@@ -12,18 +12,17 @@ from rest_framework.filters import OrderingFilter
 
 from catalog.api.filters import MultiFieldSearchFilter, CourseFilter
 from catalog.api.serializers import DetailedCatalogCourseSerializer, SimpleCatalogCourseSerializer, \
-    CategoryListSerializer
+    CategoryListSerializer, MobileCatalogCourseSerializer
 from courses.api.serializers import TagSerializer
 from courses.models import Course, Category, Tag
 from learning.models import CourseEnrollment
 
 
 class BaseCatalogCourseListView(generics.ListAPIView):
-    serializer_class = SimpleCatalogCourseSerializer
     ordering_fields = ['avg_rating', 'title', 'price', 'enrolled_learners', 'reviews_no']
     filter_backends = [MultiFieldSearchFilter, filters.DjangoFilterBackend, OrderingFilter]
-    filterset_class = CourseFilter
     pagination_class = type('StandardPagination', (PageNumberPagination,), {'page_size': 20})
+    filterset_class = CourseFilter
 
     def get_queryset(self):
         return (Course.objects.filter(active=True)
@@ -33,6 +32,7 @@ class BaseCatalogCourseListView(generics.ListAPIView):
 
     def filter_queryset(self, queryset):
         ordering = self.request.query_params.get("ordering", "")
+        ordering = 'enrolled_learners_count' if ordering.lstrip('-') == 'enrolled_learners' else ordering
         ordering_fields = ['avg_rating', 'title', 'price', 'enrolled_learners_count', 'reviews_no']
         # Check if ordering is requested on a valid field
         if ordering.lstrip('-') in ordering_fields:
@@ -57,7 +57,7 @@ class WebCatalogCourseListView(BaseCatalogCourseListView):
 
 
 class MobileCatalogCourseListView(BaseCatalogCourseListView):
-    serializer_class = DetailedCatalogCourseSerializer
+    serializer_class = MobileCatalogCourseSerializer
     pagination_class = type('MobilePagination', (PageNumberPagination,), {'page_size': 10})
 
 
