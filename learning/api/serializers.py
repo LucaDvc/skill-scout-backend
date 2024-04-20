@@ -1,8 +1,11 @@
+from django.db.models import Count, Sum
 from rest_framework import serializers
 
-from courses.api.serializers import CourseSerializer
+from courses.api.serializers import CourseSerializer, ReviewSerializer
 from learning.models import LearnerProgress, CodeChallengeSubmission, TestResult
 from uuid import UUID
+
+from users.api.serializers import SimpleProfileSerializer
 
 
 class LearnerProgressSerializer(serializers.ModelSerializer):
@@ -14,9 +17,17 @@ class LearnerProgressSerializer(serializers.ModelSerializer):
 
 class LearnerCourseSerializer(CourseSerializer):
     learner_progress = serializers.SerializerMethodField()
+    instructor = SimpleProfileSerializer(many=False, read_only=True)
+    enrolled_learners = serializers.SerializerMethodField()
+    level = serializers.CharField(source='get_level_display')
+    lessons_count = serializers.SerializerMethodField()
 
     class Meta(CourseSerializer.Meta):
-        fields = CourseSerializer.Meta.fields + ['learner_progress']
+        fields = (CourseSerializer.Meta.fields +
+                  ['learner_progress', 'average_rating', 'instructor', 'enrolled_learners', 'level', 'lessons_count'])
+
+    def get_enrolled_learners(self, obj):
+        return obj.enrolled_learners.count()
 
     def fetch_learner_progress(self, course):
         user = self.context['request'].user
@@ -30,6 +41,13 @@ class LearnerCourseSerializer(CourseSerializer):
     def get_learner_progress(self, course):
         learner_progress = self.fetch_learner_progress(course)
         return LearnerProgressSerializer(learner_progress).data if learner_progress else None
+
+    def get_lessons_count(self, course):
+        return course.chapter_set.annotate(
+            lessons_count=Count('lesson')
+        ).aggregate(
+            total=Sum('lessons_count')
+        )['total']
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)

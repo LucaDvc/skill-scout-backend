@@ -1,3 +1,4 @@
+from django.db.models import Count, Sum
 from rest_framework import serializers
 
 from courses.api.serializers import TagSerializer, CategoryField, ReviewSerializer
@@ -58,11 +59,11 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
 class MobileCatalogCourseSerializer(SimpleCatalogCourseSerializer):
     is_enrolled = serializers.SerializerMethodField()
     learner_progress = serializers.SerializerMethodField()
+    lessons_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
-        fields = SimpleCatalogCourseSerializer.Meta.fields + ['is_enrolled', 'learner_progress']
-
+        fields = SimpleCatalogCourseSerializer.Meta.fields + ['is_enrolled', 'learner_progress', 'lessons_count']
 
     def get_is_enrolled(self, course):
         user = self.context['request'].user
@@ -85,6 +86,13 @@ class MobileCatalogCourseSerializer(SimpleCatalogCourseSerializer):
     def get_learner_progress(self, course):
         learner_progress = self.fetch_learner_progress(course)
         return LearnerProgressSerializer(learner_progress).data if learner_progress else None
+
+    def get_lessons_count(self, course):
+        return course.chapter_set.annotate(
+            lessons_count=Count('lesson')
+        ).aggregate(
+            total=Sum('lessons_count')
+        )['total']
 
 
 class CategoryListSerializer(serializers.ModelSerializer):
