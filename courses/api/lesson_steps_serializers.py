@@ -100,6 +100,24 @@ class CodeChallengeLessonStepSerializer(serializers.ModelSerializer,
 
         return code_lesson_step
 
+    def update(self, instance, validated_data):
+        test_cases_data = validated_data.pop('test_cases', None)
+        language_data = validated_data.pop('language', None)
+
+        if language_data:
+            instance.language, _ = cache_utils.get_language_by_id(language_data['id'])
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if test_cases_data is not None:
+            instance.test_cases.all().delete()  # Simplest approach: Clear existing test cases
+            for test_case_data in test_cases_data:
+                CodeChallengeTestCase.objects.create(code_challenge_step=instance, **test_case_data)
+
+        return instance
+
     def to_representation(self, obj):
         representation = super().to_representation(obj)
         representation['test_cases'] = CodeChallengeTestCaseSerializer(obj.test_cases.all(), many=True, context=self.context).data
