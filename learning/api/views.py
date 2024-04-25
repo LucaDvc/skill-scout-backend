@@ -7,6 +7,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
+from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
@@ -53,6 +54,29 @@ class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
         course_data = self.get_course_data(course)
 
         return Response(course_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_quiz_step(request, pk):
+    user = request.user
+
+    try:
+        quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
+            base_step_id=pk,
+            base_step__lesson__chapter__course__enrolled_learners=user
+        )
+        course_id = quiz_step.base_step.lesson.chapter.course_id
+    except QuizLessonStep.DoesNotExist:
+        return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
+    if not learner_progress or not quiz_step.base_step_id in learner_progress.completed_steps:
+        quiz_data = QuizLessonStepSerializer(quiz_step, context={'is_learner': True}).data
+    else:
+        quiz_data = QuizLessonStepSerializer(quiz_step).data
+
+    return Response(quiz_data)
 
 
 @api_view(['POST'])
