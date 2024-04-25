@@ -23,9 +23,15 @@ class LearnerCourseListView(generics.ListAPIView, LearnerCourseViewMixin):
     serializer_class = LearnerCourseSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def list(self, request, *args, **kwargs):
         user = self.request.user
-        return Course.objects.filter(enrolled_learners=user)
+        enrolled_courses = Course.objects.filter(enrolled_learners=user)
+        serialized_courses = []
+        for course in enrolled_courses:
+            course_data = self.get_course_data(course)
+            serialized_courses.append(course_data)
+
+        return Response(serialized_courses)
 
 
 class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
@@ -36,9 +42,17 @@ class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
         user = self.request.user
         return Course.objects.filter(enrolled_learners=user)
 
-    def get_object(self):
-        course_id = self.kwargs['pk']
-        return get_object_or_404(self.get_queryset(), id=course_id)
+    def retrieve(self, request, *args, **kwargs):
+        user = self.request.user
+        course = self.get_object()
+        enrolled_courses = Course.objects.filter(enrolled_learners=user)
+
+        if course not in enrolled_courses:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+        course_data = self.get_course_data(course)
+
+        return Response(course_data)
 
 
 @api_view(['POST'])

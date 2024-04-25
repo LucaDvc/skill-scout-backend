@@ -1,7 +1,10 @@
 from django.core.cache import cache
 
+from catalog.api.serializers import DetailedCatalogCourseSerializer
 from courses.models import ProgrammingLanguage, Category
 from django.core.exceptions import EmptyResultSet, ObjectDoesNotExist
+
+from learning.api.serializers import LearnerCourseSerializer
 
 
 def reset_languages_cache():
@@ -62,8 +65,29 @@ def get_categories():
     return category_qs
 
 
+def get_learner_course_data(course):
+    cached_serialized_course = cache.get(f"learner_course_{course.id}")
+    if cached_serialized_course:
+        return cached_serialized_course
+    else:
+        course_data = LearnerCourseSerializer(course, context={'is_learner': True}).data
+        cache.set(f"learner_course_{course.id}", course_data, timeout=5400)
+        return course_data
+
+
+def get_catalog_course_data(course):
+    cached_serialized_course = cache.get(f"catalog_course_{course.id}")
+    if cached_serialized_course:
+        return cached_serialized_course
+    else:
+        course_data = DetailedCatalogCourseSerializer(course).data
+        cache.set(f"catalog_course_{course.id}", course_data, timeout=5400)
+        return course_data
+
+
 def cache_test(key):
     obj = cache.get(key)
-    print(str(obj))
-    print(str(type(obj)))
+    if obj:
+        print(str(obj))
+        print(str(type(obj)))
     print('tested cache')

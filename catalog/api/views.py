@@ -13,6 +13,7 @@ from rest_framework.filters import OrderingFilter
 from catalog.api.filters import MultiFieldSearchFilter, CourseFilter
 from catalog.api.serializers import DetailedCatalogCourseSerializer, SimpleCatalogCourseSerializer, \
     CategoryListSerializer, MobileCatalogCourseSerializer
+from courses import cache_utils
 from courses.api.serializers import TagSerializer
 from courses.models import Course, Category, Tag
 from learning.models import CourseEnrollment
@@ -71,6 +72,12 @@ class CatalogCourseView(generics.RetrieveAPIView):
     def get_object(self):
         pk = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=pk)
+
+    def retrieve(self, request, *args, **kwargs):
+        course = self.get_object()
+        course_data = cache_utils.get_catalog_course_data(course)
+
+        return Response(course_data)
 
 
 @api_view(['POST'])
