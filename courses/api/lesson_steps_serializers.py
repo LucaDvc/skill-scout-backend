@@ -1,6 +1,11 @@
+import time
+from uuid import UUID
+
 from courses.models import Course, Tag, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
     BaseLessonStep, ProgrammingLanguage, CodeChallengeTestCase, CodeChallengeLessonStep, Category, Review
 from rest_framework import serializers
+
+from learning.models import LearnerProgress
 from .mixins import LessonStepSerializerMixin, ValidateAllowedFieldsMixin
 from .. import cache_utils
 
@@ -54,8 +59,14 @@ class QuizLessonStepSerializer(serializers.ModelSerializer, ValidateAllowedField
 
     def to_representation(self, obj):
         representation = super().to_representation(obj)
-        representation['quiz_choices'] = QuizChoiceSerializer(obj.quizchoice_set.all(), many=True, context=self.context).data
+
+        quiz_choices = obj.quizchoice_set.all()
+        representation['quiz_choices'] = QuizChoiceSerializer(quiz_choices, many=True, context=self.context).data
         representation['type'] = 'quiz'
+        correct_choices_count = len([choice for choice in quiz_choices if choice.correct])
+        is_multiple_choice = correct_choices_count > 1
+        representation['multiple_choice'] = is_multiple_choice
+
         return representation
 
 

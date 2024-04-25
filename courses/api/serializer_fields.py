@@ -40,13 +40,13 @@ class LessonStepField(serializers.ListField):
         for item in iterable:
             # Determine which serializer to use based on the step type
             if hasattr(item, 'text_step'):
-                serializer = TextLessonStepSerializer(item.text_step)
+                serializer = TextLessonStepSerializer(item.text_step, context=self.context)
             elif hasattr(item, 'quiz_step'):
-                serializer = QuizLessonStepSerializer(item.quiz_step)
+                serializer = QuizLessonStepSerializer(item.quiz_step, context=self.context)
             elif hasattr(item, 'video_step'):
-                serializer = VideoLessonStepSerializer(item.video_step)
+                serializer = VideoLessonStepSerializer(item.video_step, context=self.context)
             elif hasattr(item, 'code_challenge_step'):
-                serializer = CodeChallengeLessonStepSerializer(item.code_challenge_step)
+                serializer = CodeChallengeLessonStepSerializer(item.code_challenge_step, context=self.context)
             else:
                 raise Exception('Unknown step type')
 
@@ -74,6 +74,3 @@ class LessonStepField(serializers.ListField):
             steps.append(serializer.validated_data)
 
         return steps
-
-
-

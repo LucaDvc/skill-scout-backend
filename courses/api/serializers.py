@@ -99,7 +99,7 @@ class ChapterSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin)
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['lessons'] = LessonSerializer(instance.lesson_set.all(), many=True).data
+        representation['lessons'] = LessonSerializer(instance.lesson_set.all(), many=True, context=self.context).data
         return representation
 
 
@@ -157,7 +157,7 @@ class CourseSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['chapters'] = ChapterSerializer(instance.chapter_set.all(), many=True).data
+        representation['chapters'] = ChapterSerializer(instance.chapter_set.all(), many=True, context=self.context).data
         return representation
 
     def update(self, instance, validated_data):
