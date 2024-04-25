@@ -12,6 +12,10 @@ from learning.utils import batch_queryset
 from celery import shared_task
 from courses import judge0_service
 
+from celery.utils.log import get_task_logger
+
+logger = get_task_logger(__name__)
+
 
 @shared_task(bind=True, max_retries=3)
 def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_error=False):
@@ -39,7 +43,6 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
         code_challenge_submission.submitted_code = code
         code_challenge_submission.error_message = None
         code_challenge_submission.save()
-    print('before batching')
     batch_size = 20
     batches = batch_queryset(test_cases, batch_size)
     for batch in batches:
@@ -52,7 +55,6 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
                 test_case=test_case
             )
             test_results_batch.append(test_result)
-            print(test_result)
             submission = {
                 "source_code": code,
                 "language_id": code_challenge_step.language_id,
@@ -64,12 +66,10 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
 
         batch_submission_response = judge0_service.submit_batch(submissions)
         submission_tokens = [submission['token'] for submission in batch_submission_response]
-        print(submission_tokens)
 
         for token, test_result in zip(submission_tokens, test_results_batch):
             token_to_testresult_mapping[token] = test_result
 
-        print(token_to_testresult_mapping)
         # call judge0 api to check batch results (with the tokens)
         # Set up a loop to poll the Judge0 API for the results
         max_retries = 5
@@ -80,20 +80,15 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
             all_results_received = True
             try:
                 result = judge0_service.get_batch_submission_result(submission_tokens)
-                print(result)
             except requests.HTTPError as e:
-                print(str(e))
                 retries += 1
                 all_results_received = False
                 continue
             submissions = result.get('submissions', [])
-            print('iterating submissions')
             for submission in submissions:
-                print(submission)
                 status = submission.get('status', {}).get('description', '')
                 if status not in ['In Queue', 'Processing']:
                     token = submission.get('token', '')
-                    print(token)
                     tokens_to_remove.append(token)
                     test_result = token_to_testresult_mapping[token]
                     test_result.status = status
@@ -109,9 +104,9 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
                     if test_result.stderr or test_result.compile_err:
                         code_challenge_submission.error_message = f"Error: {test_result.stderr or test_result.compile_err}"
                         code_challenge_submission.passed = False
-                        print(f"Error encountered: {code_challenge_submission.error_message}")
+                        logger.error(f"Error encountered: {code_challenge_submission.error_message}")
                         if not continue_on_error:
-                            print("Stopping further processing due to error")
+                            logger.error("Stopping further processing due to error")
                             code_challenge_submission.save()
                             return CodeChallengeSubmissionSerializer(code_challenge_submission).data
                 else:

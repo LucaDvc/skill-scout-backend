@@ -16,4 +16,4 @@ class Command(BaseCommand):
             cache.set(f"catalog_course_{course.id}", serialized_course, timeout=5400)
             self.stdout.write(self.style.SUCCESS(f"Course {course.id} cached"))
 
-        self.stdout.write(self.style.SUCCESS('All active courses cached'))
+        self.stdout.write(self.style.SUCCESS('All active catalog courses cached'))

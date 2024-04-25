@@ -15,6 +15,11 @@ from pathlib import Path
 
 import rest_framework_simplejwt
 
+
+from celery.schedules import crontab
+import courses_project.tasks
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,7 +33,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -241,6 +246,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Celery settings
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
+
+
+CELERY_BEAT_SCHEDULE = {
+    "refresh_catalog_courses_cache": {
+        "task": "courses_project.tasks.refresh_catalog_courses_cache",
+        "schedule": crontab(minute="*/5"),
+    },
+    "refresh_learner_courses_cache": {
+        "task": "courses_project.tasks.refresh_learner_courses_cache",
+        "schedule": crontab(minute="*/5"),
+    }
+}
 
 # S3 configuration
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
