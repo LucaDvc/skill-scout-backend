@@ -13,7 +13,7 @@ class LessonStepTypeField(serializers.Field):
 
 class LessonStepSerializerMixin(serializers.Serializer):
     id = serializers.UUIDField(source='base_step.id', read_only=True)
-    order = serializers.IntegerField(source='base_step.order')
+    order = serializers.IntegerField(source='base_step.order', required=False)
     type = LessonStepTypeField()
 
     def validate(self, data):
