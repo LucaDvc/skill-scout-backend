@@ -122,6 +122,19 @@ def course_wishlist(request, pk):
         return Response({}, status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_wishlist(request):
+    user = request.user
+    courses = user.wishlist.all().annotate(
+        avg_rating=Coalesce(Avg('review__rating'), Value(0.0)),
+        enrolled_learners_count=Count('enrolled_learners', distinct=True)
+    )
+    serializer = SimpleCatalogCourseSerializer(courses, many=True)
+
+    return Response(serializer.data)
+
+
 class CategoryListView(generics.ListAPIView):
     queryset = Category.objects.filter(supercategory__isnull=True)  # Top-level categories only
     serializer_class = CategoryListSerializer
