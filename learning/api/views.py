@@ -293,3 +293,13 @@ class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         review_id = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=review_id)
+
+
+@api_view(['GET'])
+def get_user_course_review(request, course_id):
+    user = request.user
+    review = Review.objects.filter(course_id=course_id, learner=user).first()
+    if not review:
+        return Response({'detail': 'Review not found'}, status=status.HTTP_404_NOT_FOUND)
+    serializer = ReviewSerializer(review)
+    return Response(serializer.data, status=status.HTTP_200_OK)

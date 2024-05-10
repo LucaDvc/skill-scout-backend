@@ -15,5 +15,6 @@ urlpatterns = [
     path('quiz-steps/<uuid:pk>/', views.get_quiz_step, name='get-quiz-step'),
 
     path('courses/<uuid:course_id>/reviews/', views.ReviewListCreateView.as_view(), name='review-list-create'),
-    path('reviews/<uuid:pk>/', views.ReviewRetrieveUpdateDestroyView.as_view(), name='review-retrieve-update-destroy')
+    path('reviews/<uuid:pk>/', views.ReviewRetrieveUpdateDestroyView.as_view(), name='review-retrieve-update-destroy'),
+    path('courses/<uuid:course_id>/user-review/', views.get_user_course_review, name='get-user-course-review')
 ]
