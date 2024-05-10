@@ -24,12 +24,16 @@ class ProfileCourseSerializer(serializers.ModelSerializer):
 
 
 class DetailedProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
-    courses = ProfileCourseSerializer(many=True, read_only=True, source='course_set')
+    courses = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'city', 'short_bio', 'about', 'picture', 'linked_in', 'facebook',
                   'personal_website', 'youtube', 'is_private', 'courses']
+
+    def get_courses(self, obj):
+        active_courses = obj.course_set.filter(active=True)
+        return ProfileCourseSerializer(active_courses, many=True).data
 
 
 class SimpleCourseSerializer(serializers.ModelSerializer):
