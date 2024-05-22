@@ -47,4 +47,5 @@ urlpatterns = [
 
     path('analytics/<uuid:course_id>/enrollment/', views.get_enrollment_analytics, name='enrollment-analytics'),
     path('analytics/<uuid:course_id>/completion/', views.get_course_completion_analytics, name='completion-analytics'),
+    path('analytics/<uuid:course_id>/activity/', views.get_daily_activity_analytics, name='activity-analytics'),
 ]

@@ -1,5 +1,4 @@
 import json
-
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F, Count
 from django.http import Http404
@@ -11,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters import rest_framework as filters
 from django.db.models.functions import TruncDate
+from datetime import datetime, timedelta
 
 from courses import cache_utils
 from learning.models import CourseEnrollment
@@ -18,10 +18,10 @@ from courses.api.serializers import CourseSerializer, ChapterSerializer, LessonS
 from courses.api.lesson_steps_serializers import TextLessonStepSerializer, \
     QuizLessonStepSerializer, QuizChoiceSerializer, VideoLessonStepSerializer, CodeChallengeLessonStepSerializer, \
     CodeChallengeTestCaseSerializer
-from .serializers import CourseEnrollmentSerializer
+from .serializers import CourseEnrollmentSerializer, DailyActiveUsersAnalyticsSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
     BaseLessonStep, CodeChallengeLessonStep, CodeChallengeTestCase
-from ..models import CourseCompletionAnalytics
+from ..models import CourseCompletionAnalytics, DailyActiveUsersAnalytics
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -461,3 +461,35 @@ def get_course_completion_analytics(request, course_id):
 
     return Response({'learners_completed': course_completion.learners_completed,
                      'learners_in_progress': course_completion.learners_in_progress})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_daily_activity_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+
+    # Get optional date range from query parameters
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+
+    if start_date:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    else:
+        # Default start date to course release date or to one month ago
+        start_date = course.release_date if course.release_date else datetime.now().date() - timedelta(days=30)
+
+    if end_date:
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    else:
+        # Default end date to today
+        end_date = datetime.now().date()
+
+    # Fetch analytics data for the given course and date range
+    analytics_data = DailyActiveUsersAnalytics.objects.filter(
+        course=course,
+        date__range=[start_date, end_date]
+    )
+
+    serializer = DailyActiveUsersAnalyticsSerializer(analytics_data, many=True)
+    return Response(serializer.data)

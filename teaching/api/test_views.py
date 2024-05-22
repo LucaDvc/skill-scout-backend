@@ -1,8 +1,11 @@
 # courses/tests.py
+from datetime import date, timedelta
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
+from teaching.models import DailyActiveUsersAnalytics
 from users.models import User
 from courses.models import Course, Category, Tag, Chapter, Lesson, BaseLessonStep, TextLessonStep, ProgrammingLanguage
 from django.core.cache import cache
@@ -217,3 +220,67 @@ class GetEnrollmentAnalyticsTest(APITestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.data, list)
+
+
+class GetActivityAnalyticsTest(APITestCase):
+    def setUp(self):
+        # Create a user
+        self.user = User.objects.create_user(
+            email='instructor@example.com',
+            password='testpassword',
+            first_name='Instructor',
+            last_name='Test'
+        )
+
+        # Create a course with a release date
+        self.course = Course.objects.create(
+            title='Test Course', instructor=self.user, release_date=date.today() - timedelta(days=60)
+        )
+
+        # Create some DailyActiveUsersAnalytics data for the last 5 days
+        self.analytics_data = [
+            DailyActiveUsersAnalytics.objects.create(
+                course=self.course, date=date.today() - timedelta(days=i), active_users=i*10
+            )
+            for i in range(5)
+        ]
+
+        # Set the URL
+        self.url = reverse('activity-analytics', kwargs={'course_id': self.course.id})
+
+    def test_get_activity_analytics_default_date_range(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Since default date range includes last 30 days, all 5 records should be included
+        self.assertEqual(len(response.data), 5)
+        # Check the values of active_users
+        for i, entry in enumerate(response.data):
+            self.assertEqual(entry['active_users'], (4 - i) * 10)
+
+    def test_get_activity_analytics_custom_date_range(self):
+        self.client.force_authenticate(user=self.user)
+        start_date = (date.today() - timedelta(days=4)).strftime('%Y-%m-%d')
+        end_date = date.today().strftime('%Y-%m-%d')
+        response = self.client.get(self.url, {'startDate': start_date, 'endDate': end_date})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Since we're fetching the last 5 days of data, all 5 records should be included
+        self.assertEqual(len(response.data), 5)
+        # Check the values of active_users
+        for i, entry in enumerate(response.data):
+            self.assertEqual(entry['active_users'], (4 - i) * 10)
+
+    def test_get_activity_analytics_partial_date_range(self):
+        self.client.force_authenticate(user=self.user)
+        start_date = (date.today() - timedelta(days=2)).strftime('%Y-%m-%d')
+        response = self.client.get(self.url, {'startDate': start_date})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Since we're fetching from 2 days ago to today, 3 records should be included
+        self.assertEqual(len(response.data), 3)
+        # Check the values of active_users
+        for i, entry in enumerate(response.data):
+            self.assertEqual(entry['active_users'], (2 - i) * 10)
+
+    def test_get_activity_analytics_no_authentication(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
