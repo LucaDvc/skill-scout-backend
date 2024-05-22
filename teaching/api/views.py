@@ -1,9 +1,10 @@
 import json
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import F
+from django.db.models import F, Count
 from django.http import Http404
 from rest_framework import generics, status, serializers
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
@@ -425,5 +426,24 @@ class CourseEnrolledLearnersListView(generics.ListAPIView):
         course = get_object_or_404(courses, id=course_id)
         return CourseEnrollment.objects.filter(course=course)
 
-
 # TODO: ENDPOINT TO PUBLISH COURSE, WITH VALIDATION OF THE USER PROFILE (CAN'T BE PRIVATE), OTHER VALIDATIONS
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_enrollment_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+    from django.db.models.functions import TruncDate
+    enrollment_counts_by_date = (
+        CourseEnrollment.objects
+        .filter(course=course)
+        .annotate(enrollment_date=TruncDate('enrolled_at'))
+        .values('enrollment_date')
+        .annotate(count=Count('id'))
+        .order_by('enrollment_date')
+    )
+
+    enrollment_data = list(enrollment_counts_by_date)
+
+    return Response(enrollment_data)

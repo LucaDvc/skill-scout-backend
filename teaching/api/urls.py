@@ -44,4 +44,6 @@ urlpatterns = [
          name='test-case-list-create'),
     path('test_cases/<int:pk>/', views.CodeChallengeTestCaseRetrieveUpdateDestroyView.as_view(),
          name='test-case-retrieve-update-destroy'),
+
+    path('analytics/<uuid:course_id>/enrollment/', views.get_enrollment_analytics, name='enrollment-analytics'),
 ]
