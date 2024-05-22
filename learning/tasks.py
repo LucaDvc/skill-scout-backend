@@ -42,7 +42,10 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
         )
         code_challenge_submission.submitted_code = code
         code_challenge_submission.error_message = None
+        if not created:
+            code_challenge_submission.attempts += 1
         code_challenge_submission.save()
+
     batch_size = 20
     batches = batch_queryset(test_cases, batch_size)
     for batch in batches:

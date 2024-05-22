@@ -9,12 +9,13 @@ from rest_framework.exceptions import ValidationError
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
+from teaching.models import LearnerQuizPerformance
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
 from rest_framework.permissions import IsAuthenticated
 
-from learning.models import LearnerProgress
+from learning.models import LearnerProgress, CourseEnrollment
 from learning.tasks import evaluate_code
 from celery import states
 from django.core.cache import cache
@@ -154,25 +155,6 @@ def check_code_challenge_result(request, task_id):
         return Response({'status': states.PENDING})
 
 
-def get_next_step(lesson_step):
-    lesson = lesson_step.lesson
-    chapter = lesson_step.lesson.chapter
-    next_step = lesson.baselessonstep_set.filter(order=lesson_step.order + 1).first()
-    if not next_step:
-        next_lesson = chapter.lesson_set.filter(order=lesson.order + 1).first()
-        if next_lesson:
-            next_step = next_lesson.baselessonstep_set.first()
-    if not next_step:
-        course = chapter.course
-        next_chapter = course.chapter_set.filter(creation_date__gt=chapter.creation_date).first()
-        if next_chapter:
-            next_step = next_chapter.lesson_set.first().baselessonstep_set.first()
-        else:
-            next_step = lesson_step
-
-    return next_step
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_quiz(request, pk):
@@ -206,12 +188,42 @@ def submit_quiz(request, pk):
 
     is_correct = submitted_choices == correct_choices
 
+    performance, created = LearnerQuizPerformance.objects.get_or_create(
+        learner=user,
+        quiz_step=quiz_step,
+        defaults={'passed': is_correct, 'attempts': 1}
+    )
+
+    if not created:
+        performance.attempts += 1
+        performance.passed = is_correct
+        performance.save()
+
     if is_correct:
         response_data = {'detail': 'Correct answer'}
     else:
         response_data = {'detail': 'Incorrect answer'}
 
     return Response(response_data, status=status.HTTP_200_OK)
+
+
+def get_next_step(lesson_step):
+    lesson = lesson_step.lesson
+    chapter = lesson_step.lesson.chapter
+    next_step = lesson.baselessonstep_set.filter(order=lesson_step.order + 1).first()
+    if not next_step:
+        next_lesson = chapter.lesson_set.filter(order=lesson.order + 1).first()
+        if next_lesson:
+            next_step = next_lesson.baselessonstep_set.first()
+    if not next_step:
+        course = chapter.course
+        next_chapter = course.chapter_set.filter(creation_date__gt=chapter.creation_date).first()
+        if next_chapter:
+            next_step = next_chapter.lesson_set.first().baselessonstep_set.first()
+        else:
+            next_step = lesson_step
+
+    return next_step
 
 
 @api_view(['POST'])
@@ -249,6 +261,10 @@ def complete_lesson_step(request, step_id):
                 learner_progress.last_stopped_step = next_step
                 learner_progress.last_stopped_lesson = next_step.lesson
                 learner_progress.last_stopped_chapter = next_step.lesson.chapter
+        else:
+            course_enrollment = CourseEnrollment.objects.get(course=chapter.course, learner=user)
+            course_enrollment.completed = True
+            course_enrollment.save()
 
     learner_progress.save()
 

@@ -18,7 +18,7 @@ import rest_framework_simplejwt
 
 from celery.schedules import crontab
 import courses_project.tasks
-
+import teaching.apps
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'learning.apps.LearningConfig',
     'catalog.apps.CatalogConfig',
+    'teaching.apps.TeachingConfig',
 ]
 
 REST_FRAMEWORK = {
@@ -251,12 +252,16 @@ CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
 CELERY_BEAT_SCHEDULE = {
     "refresh_catalog_courses_cache": {
         "task": "courses_project.tasks.refresh_catalog_courses_cache",
-        "schedule": crontab(minute="*/5"),
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes, but for production, change to every hour
     },
     "refresh_learner_courses_cache": {
         "task": "courses_project.tasks.refresh_learner_courses_cache",
-        "schedule": crontab(minute="*/5"),
-    }
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes, but for production, change to every hour
+    },
+    "update_courses_daily_active_users": {
+        "task": "courses_project.tasks.update_daily_active_users",
+        "schedule": crontab(minute=0, hour='*/6')  # Every 6 hours
+    },
 }
 
 # S3 configuration

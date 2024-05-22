@@ -11,7 +11,7 @@ from users.api.serializers import SimpleProfileSerializer
 class LearnerProgressSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearnerProgress
-        fields = ['last_stopped_step', 'completed_chapters', 'completed_lessons', 'completed_steps', 'completion_ratio']
+        fields = ['last_stopped_lesson', 'last_stopped_step', 'completed_chapters', 'completed_lessons', 'completed_steps', 'completion_ratio']
 
 
 class LearnerCourseSerializer(CourseSerializer):
