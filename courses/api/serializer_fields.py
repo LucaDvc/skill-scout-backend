@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import serializers
 import os
 from urllib.parse import urlparse
@@ -7,6 +9,7 @@ from django.core.files.base import ContentFile
 
 from courses.api.lesson_steps_serializers import TextLessonStepSerializer, VideoLessonStepSerializer, \
     CodeChallengeLessonStepSerializer, QuizLessonStepSerializer
+from courses.models import TextLessonStep, QuizLessonStep, VideoLessonStep, CodeChallengeLessonStep
 
 
 class ImageOrUrlField(serializers.Field):
@@ -58,19 +61,39 @@ class LessonStepField(serializers.ListField):
         steps = []
         for item in data:
             step_type = item.get('type')
+            step_id = item.get('id', None)
+
             if step_type == 'text':
-                serializer = TextLessonStepSerializer(data=item)
+                serializer_class = TextLessonStepSerializer
+                model_class = TextLessonStep
             elif step_type == 'quiz':
-                serializer = QuizLessonStepSerializer(data=item)
+                serializer_class = QuizLessonStepSerializer
+                model_class = QuizLessonStep
             elif step_type == 'video':
-                serializer = VideoLessonStepSerializer(data=item)
+                serializer_class = VideoLessonStepSerializer
+                model_class = VideoLessonStep
             elif step_type == 'codechallenge':
-                serializer = CodeChallengeLessonStepSerializer(data=item)
+                serializer_class = CodeChallengeLessonStepSerializer
+                model_class = CodeChallengeLessonStep
             else:
                 raise serializers.ValidationError('Unknown step type')
 
+            if step_id:
+                try:
+                    uuid.UUID(step_id, version=4)
+                except ValueError:
+                    # If it's not a valid uuid, create a new instance
+                    serializer = serializer_class(data=item, context=self.context)
+                else:
+                    # If it's a valid uuid, update the existing instance
+                    step_instance = model_class.objects.get(base_step_id=step_id)
+                    serializer = serializer_class(step_instance, data=item)
+            else:
+                serializer = serializer_class(data=item, context=self.context)
             serializer.is_valid(raise_exception=True)
-            serializer.validated_data['type'] = step_type
-            steps.append(serializer.validated_data)
+            step_instance = serializer.save()  # This save will either create or update the instance
+            steps.append(step_instance)
+
+        print('return ' + str(steps))
 
         return steps

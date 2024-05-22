@@ -49,7 +49,6 @@ class SimpleCatalogCourseSerializer(serializers.ModelSerializer):
     average_rating = serializers.FloatField(read_only=True, source='avg_rating')
     reviews_no = serializers.IntegerField(read_only=True)
 
-
     class Meta:
         model = Course
         fields = ['id', 'title', 'intro', 'instructor', 'category', 'level', 'total_hours', 'price', 'image', 'tags',

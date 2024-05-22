@@ -4,7 +4,7 @@ from uuid import UUID
 from django.db import transaction
 from rest_framework import serializers
 
-from courses.models import Course, Tag, Chapter, Lesson,  ProgrammingLanguage, Category, Review
+from courses.models import Course, Tag, Chapter, Lesson, ProgrammingLanguage, Category, Review, BaseLessonStep
 from users.api.serializers import LearnerSerializer
 from .mixins import ValidateAllowedFieldsMixin
 from .serializer_fields import ImageOrUrlField, LessonStepField
@@ -47,7 +47,10 @@ class LessonSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
 
     def update(self, instance, validated_data):
         with transaction.atomic():
-            lesson_steps_data = validated_data.pop('baselessonstep_set', [])
+            lesson_steps_data = validated_data.get('baselessonstep_set', [])
+            if lesson_steps_data:
+                # Delete the steps that aren't included in the request
+                instance.baselessonstep_set.exclude(id__in=[step.id for step in lesson_steps_data]).delete()
             instance = super().update(instance, validated_data)
 
         return instance

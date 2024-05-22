@@ -125,6 +125,11 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         lesson_id = self.kwargs['pk']
         return get_object_or_404(self.get_queryset(), id=lesson_id)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['lesson'] = self.get_object()  # Ensure 'lesson' is included in the context
+        return context
+
     def perform_update(self, serializer):
         lesson = self.get_object()
         chapter = lesson.chapter
