@@ -10,6 +10,7 @@ from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters import rest_framework as filters
+from django.db.models.functions import TruncDate
 
 from courses import cache_utils
 from learning.models import CourseEnrollment
@@ -20,6 +21,7 @@ from courses.api.lesson_steps_serializers import TextLessonStepSerializer, \
 from .serializers import CourseEnrollmentSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
     BaseLessonStep, CodeChallengeLessonStep, CodeChallengeTestCase
+from ..models import CourseCompletionAnalytics
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -434,7 +436,7 @@ class CourseEnrolledLearnersListView(generics.ListAPIView):
 def get_enrollment_analytics(request, course_id):
     instructor = request.user
     course = get_object_or_404(Course, id=course_id, instructor=instructor)
-    from django.db.models.functions import TruncDate
+
     enrollment_counts_by_date = (
         CourseEnrollment.objects
         .filter(course=course)
@@ -447,3 +449,15 @@ def get_enrollment_analytics(request, course_id):
     enrollment_data = list(enrollment_counts_by_date)
 
     return Response(enrollment_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_course_completion_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+    course_completion, created = CourseCompletionAnalytics.objects.get_or_create(course=course)
+    course_completion.update_completion_stats()
+
+    return Response({'learners_completed': course_completion.learners_completed,
+                     'learners_in_progress': course_completion.learners_in_progress})

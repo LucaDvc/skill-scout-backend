@@ -3,7 +3,6 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
-from courses import cache_utils
 from users.models import User
 from courses.models import Course, Category, Tag, Chapter, Lesson, BaseLessonStep, TextLessonStep, ProgrammingLanguage
 from django.core.cache import cache
@@ -181,3 +180,40 @@ class CourseListCreateViewTest(APITestCase):
         self.assertEqual(Course.objects.count(), 2)
         # Check that the course's instructor is the logged-in user.
         self.assertEqual(Course.objects.first().instructor, self.user)
+
+
+class GetCourseCompletionAnalyticsTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='instructor@example.com',
+            password='testpassword',
+            first_name='Instructor',
+            last_name='Test'
+        )
+        self.course = Course.objects.create(title='Test Course', instructor=self.user)
+        self.url = reverse('completion-analytics', kwargs={'course_id': self.course.id})
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_course_completion_analytics(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('learners_completed', response.data)
+        self.assertIn('learners_in_progress', response.data)
+
+
+class GetEnrollmentAnalyticsTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='instructor@example.com',
+            password='testpassword',
+            first_name='Instructor',
+            last_name='Test'
+        )
+        self.course = Course.objects.create(title='Test Course', instructor=self.user)
+        self.url = reverse('enrollment-analytics', kwargs={'course_id': self.course.id})
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_enrollment_analytics(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
