@@ -8,8 +8,9 @@ import requests
 from django.core.files.base import ContentFile
 
 from courses.api.lesson_steps_serializers import TextLessonStepSerializer, VideoLessonStepSerializer, \
-    CodeChallengeLessonStepSerializer, QuizLessonStepSerializer
-from courses.models import TextLessonStep, QuizLessonStep, VideoLessonStep, CodeChallengeLessonStep
+    CodeChallengeLessonStepSerializer, QuizLessonStepSerializer, SortingProblemLessonStepSerializer
+from courses.models import TextLessonStep, QuizLessonStep, VideoLessonStep, CodeChallengeLessonStep, \
+    SortingProblemLessonStep
 
 
 class ImageOrUrlField(serializers.Field):
@@ -50,6 +51,8 @@ class LessonStepField(serializers.ListField):
                 serializer = VideoLessonStepSerializer(item.video_step, context=self.context)
             elif hasattr(item, 'code_challenge_step'):
                 serializer = CodeChallengeLessonStepSerializer(item.code_challenge_step, context=self.context)
+            elif hasattr(item, 'sorting_problem_step'):
+                serializer = SortingProblemLessonStepSerializer(item.sorting_problem_step, context=self.context)
             else:
                 raise Exception('Unknown step type')
 
@@ -75,6 +78,9 @@ class LessonStepField(serializers.ListField):
             elif step_type == 'codechallenge':
                 serializer_class = CodeChallengeLessonStepSerializer
                 model_class = CodeChallengeLessonStep
+            elif step_type == 'sorting_problem':
+                serializer_class = SortingProblemLessonStepSerializer
+                model_class = SortingProblemLessonStep
             else:
                 raise serializers.ValidationError('Unknown step type')
 
@@ -93,7 +99,5 @@ class LessonStepField(serializers.ListField):
             serializer.is_valid(raise_exception=True)
             step_instance = serializer.save()  # This save will either create or update the instance
             steps.append(step_instance)
-
-        print('return ' + str(steps))
 
         return steps

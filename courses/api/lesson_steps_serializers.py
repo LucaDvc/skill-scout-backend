@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 
 from courses.models import TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep,  CodeChallengeTestCase, CodeChallengeLessonStep
+    BaseLessonStep, CodeChallengeTestCase, CodeChallengeLessonStep, SortingProblemOption, SortingProblemLessonStep
 from rest_framework import serializers
 from .mixins import LessonStepSerializerMixin, ValidateAllowedFieldsMixin
 from .. import cache_utils
@@ -35,7 +35,6 @@ class TextLessonStepSerializer(serializers.ModelSerializer, LessonStepSerializer
         # Returning the base step instance to be used in the lesson serializer
         return base_step if isinstance(base_step_data, dict) else text_step
 
-    # TODO copy paste in every step serializer
     def update(self, instance, validated_data):
         base_step_data = validated_data.pop('base_step')
         base_step = instance.base_step
@@ -256,4 +255,76 @@ class CodeChallengeLessonStepSerializer(serializers.ModelSerializer,
         representation = super().to_representation(obj)
         representation['test_cases'] = CodeChallengeTestCaseSerializer(obj.test_cases.all(), many=True, context=self.context).data
         representation['type'] = 'codechallenge'
+        return representation
+
+
+class SortingProblemOptionSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
+    class Meta:
+        model = SortingProblemOption
+        fields = ['id', 'text', 'correct_order']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # If the user is viewing the course as a learner, remove the 'correct_order' field from the response
+        if self.context.get('is_learner'):
+            representation.pop('correct_order', None)
+
+        return representation
+
+
+class SortingProblemLessonStepSerializer(serializers.ModelSerializer, LessonStepSerializerMixin):
+    options = SortingProblemOptionSerializer(many=True, required=False)
+
+    class Meta:
+        model = SortingProblemLessonStep
+        fields = ['id', 'order', 'title', 'statement', 'options']
+
+    def create(self, validated_data):
+        base_step_data = validated_data.pop('base_step')
+        if isinstance(base_step_data, dict):
+            base_step_data['lesson'] = self.context['lesson']
+            base_step = BaseLessonStep.objects.create(**base_step_data)
+        else:
+            base_step = base_step_data
+
+        options_data = validated_data.pop('options', [])
+        sorting_problem = SortingProblemLessonStep.objects.create(base_step=base_step, **validated_data)
+
+        for option_data in options_data:
+            # Remove the id field if it exists, as it's not needed when creating a new instance
+            option_data.pop('id', None)
+            SortingProblemOption.objects.create(sorting_problem=sorting_problem, **option_data)
+
+        # Returning the base step instance to be used in the lesson serializer
+        return base_step if isinstance(base_step_data, dict) else sorting_problem
+
+    def update(self, instance, validated_data):
+        base_step_data = validated_data.pop('base_step')
+        if base_step_data:
+            base_step = instance.base_step
+            for attr, value in base_step_data.items():
+                setattr(base_step, attr, value)
+            base_step.save()
+
+        options_data = validated_data.pop('options', [])
+        print(options_data)
+        if options_data is not None:
+            instance.options.all().delete()  # Clear existing quiz choices
+            for option_data in options_data:
+                option_data.pop('id', None)
+                SortingProblemOption.objects.create(sorting_problem=instance, **option_data)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        # Returning the base step instance to be used in the lesson serializer
+        return base_step if base_step_data else instance
+
+    def to_representation(self, obj):
+        representation = super().to_representation(obj)
+
+        options = obj.options.all()
+        representation['options'] = SortingProblemOptionSerializer(options, many=True, context=self.context).data
+        representation['type'] = 'sorting_problem'
+
         return representation

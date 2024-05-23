@@ -55,5 +55,3 @@ class CodeChallengeSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CodeChallengeSubmission
         fields = ['code_challenge_id', 'learner_id', 'submitted_code', 'passed', 'error_message', 'test_results']
-
-# TODO review serializer and crud endpoint

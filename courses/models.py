@@ -22,10 +22,12 @@ class Course(models.Model):
         OPTION_TWO = '2', 'Intermediate'
         OPTION_THREE = '3', 'Advanced'
 
-    level = models.CharField(max_length=50, null=True, blank=True, choices=DifficultyLevel.choices)  # change to False for production
+    level = models.CharField(max_length=50, null=True, blank=True,
+                             choices=DifficultyLevel.choices)  # change to False for production
 
     requirements = models.TextField(null=True, blank=True)  # change to False for production
-    total_hours = models.DecimalField(max_digits=3, decimal_places=0, null=True, blank=True)  # change to False for production
+    total_hours = models.DecimalField(max_digits=3, decimal_places=0, null=True,
+                                      blank=True)  # change to False for production
     creation_date = models.DateTimeField(auto_now_add=True, editable=False)
     release_date = models.DateField(null=True, blank=True)
     price = models.DecimalField(default=0, max_digits=4, decimal_places=0, null=True, blank=True, validators=[
@@ -52,7 +54,8 @@ class Course(models.Model):
 class Category(models.Model):
     id = models.SmallAutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    supercategory = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='subcategories')
+    supercategory = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True,
+                                      related_name='subcategories')
     top = models.BooleanField(default=False, null=True, blank=True)
 
     def __str__(self):
@@ -81,7 +84,8 @@ class Review(models.Model):
 
 
 class Tag(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)  # change to models.SmallAutoField(primary_key=True)
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True,
+                          editable=False)  # change to models.SmallAutoField(primary_key=True)
     name = models.CharField(max_length=50, null=False, blank=False)
 
     def __str__(self):
@@ -137,7 +141,8 @@ class BaseLessonStep(models.Model):
 
     def save(self, *args, **kwargs):
         if (hasattr(self, 'text_step') + hasattr(self, 'quiz_step')
-                + hasattr(self, 'video_step') + hasattr(self, 'code_challenge_step') > 1):
+                + hasattr(self, 'video_step') + hasattr(self, 'code_challenge_step')
+                + hasattr(self, 'sorting_problem_step') > 1):
             raise ValidationError('A BaseLessonStep can only have one type of child step.')
         super().save(*args, **kwargs)
 
@@ -154,12 +159,14 @@ class BaseLessonStep(models.Model):
 
 
 class TextLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='text_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='text_step')
     text = models.TextField(null=True, blank=True)  # change to False for production
 
 
 class QuizLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='quiz_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='quiz_step')
     question = models.TextField(max_length=500, null=False, blank=False)
     explanation = models.TextField(max_length=500, null=True, blank=True)  # change to False for production
 
@@ -175,7 +182,8 @@ class QuizChoice(models.Model):
 
 
 class VideoLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='video_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='video_step')
     title = models.CharField(max_length=150, null=True, blank=True)  # change to False
     video_file = models.FileField(null=True, blank=True, validators=[
         FileExtensionValidator(allowed_extensions=['MOV', 'avi', 'mp4', 'webm', 'mkv'])
@@ -183,7 +191,8 @@ class VideoLessonStep(models.Model):
 
 
 class CodeChallengeLessonStep(models.Model):
-    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True, related_name='code_challenge_step')
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='code_challenge_step')
     title = models.CharField(max_length=100, null=False, blank=False)
     description = models.TextField(null=True, blank=True)  # change to False for prod
     initial_code = models.TextField(null=True, blank=True)  # change to False for prod
@@ -212,3 +221,26 @@ class CodeChallengeTestCase(models.Model):
     class Meta:
         ordering = ['id']
         unique_together = ['code_challenge_step', 'input']
+
+
+class SortingProblemLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='sorting_problem_step')
+    title = models.CharField(max_length=100, null=False, blank=False)
+    statement = models.TextField(null=False, blank=False)
+
+    def __str__(self):
+        return self.title
+
+
+class SortingProblemOption(models.Model):
+    id = models.AutoField(primary_key=True, unique=True, editable=False)
+    sorting_problem = models.ForeignKey(SortingProblemLessonStep, on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=100, null=False, blank=False)
+    correct_order = models.PositiveIntegerField(null=False, blank=False)
+
+    class Meta:
+        ordering = ['correct_order']
+
+    def __str__(self):
+        return self.text
