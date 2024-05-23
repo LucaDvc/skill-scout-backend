@@ -6,9 +6,11 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
+from learning.models import LearnerQuizPerformance, CodeChallengeSubmission
 from teaching.models import DailyActiveUsersAnalytics, EngagementAnalytics
 from users.models import User
-from courses.models import Course, Category, Tag, Chapter, Lesson, BaseLessonStep, TextLessonStep, ProgrammingLanguage
+from courses.models import Course, Category, Tag, Chapter, Lesson, BaseLessonStep, TextLessonStep, ProgrammingLanguage, \
+    QuizLessonStep, CodeChallengeLessonStep
 from django.core.cache import cache
 
 
@@ -342,3 +344,113 @@ class GetCourseEngagementAnalyticsTest(APITestCase):
     def test_get_course_engagement_analytics_no_authentication(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class CourseAssessmentAnalyticsTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        # Create a user
+        self.user = User.objects.create_user(
+            email='instructor@example.com',
+            password='testpassword',
+            first_name='Instructor',
+            last_name='Test'
+        )
+        self.client.force_authenticate(user=self.user)
+
+        # Create a course
+        self.course = Course.objects.create(
+            instructor=self.user,
+            title='Test Course'
+        )
+
+        # Create a chapter
+        self.chapter = Chapter.objects.create(
+            course=self.course,
+            title='Test Chapter'
+        )
+
+        # Create a lesson
+        self.lesson = Lesson.objects.create(
+            chapter=self.chapter,
+            title='Test Lesson',
+            order=1
+        )
+
+        # Create a BaseLessonSteps
+        self.quiz_base_lesson_step = BaseLessonStep.objects.create(
+            lesson=self.lesson,
+            order=1
+        )
+        self.code_base_lesson_step = BaseLessonStep.objects.create(
+            lesson=self.lesson,
+            order=2
+        )
+
+        # Create a QuizLessonStep
+        self.quiz_lesson_step = QuizLessonStep.objects.create(
+            base_step=self.quiz_base_lesson_step,
+            question='Test Question',
+            explanation='Test Explanation'
+        )
+
+        # Create a CodeChallengeLessonStep
+        self.language = ProgrammingLanguage.objects.create(
+            id=1,
+            name='Python'
+        )
+        self.code_challenge_lesson_step = CodeChallengeLessonStep.objects.create(
+            base_step=self.code_base_lesson_step,
+            title='Test Code Challenge',
+            description='Test Description',
+            initial_code='print("Hello, World!")',
+            language=self.language,
+            proposed_solution='print("Hello, World!")'
+        )
+
+        # Create LearnerQuizPerformance
+        self.learner_quiz_performance = LearnerQuizPerformance.objects.create(
+            learner=self.user,
+            quiz_step=self.quiz_lesson_step,
+            attempts=1,
+            passed=True
+        )
+
+        # Create CodeChallengeSubmission
+        self.code_challenge_submission = CodeChallengeSubmission.objects.create(
+            learner=self.user,
+            code_challenge_step=self.code_challenge_lesson_step,
+            submitted_code='print("Hello, World!")',
+            passed=True
+        )
+
+    def test_get_course_assessments_analytics(self):
+        url = reverse('assessments-analytics', kwargs={'course_id': self.course.id})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('quiz_statistics', response.data)
+        self.assertIn('code_challenge_statistics', response.data)
+
+        # Check quiz statistics
+        quiz_stats = response.data['quiz_statistics']
+        self.assertEqual(len(quiz_stats), 1)
+        self.assertEqual(quiz_stats[0]['chapter'], self.chapter.title)
+        self.assertEqual(quiz_stats[0]['lesson'], self.lesson.title)
+        self.assertEqual(quiz_stats[0]['step_order'], self.quiz_base_lesson_step.order)
+        self.assertEqual(quiz_stats[0]['step_id'], self.quiz_base_lesson_step.id)
+        self.assertEqual(quiz_stats[0]['total_attempts'], 1)
+        self.assertEqual(quiz_stats[0]['total_learners'], 1)
+        self.assertEqual(quiz_stats[0]['success_rate'], 100.0)
+
+        # Check code challenge statistics
+        code_challenge_stats = response.data['code_challenge_statistics']
+        self.assertEqual(len(code_challenge_stats), 1)
+        self.assertEqual(code_challenge_stats[0]['chapter'], self.chapter.title)
+        self.assertEqual(code_challenge_stats[0]['lesson'], self.lesson.title)
+        self.assertEqual(code_challenge_stats[0]['step_order'], self.code_base_lesson_step.order)
+        self.assertEqual(code_challenge_stats[0]['step_id'], self.code_base_lesson_step.id)
+        self.assertEqual(code_challenge_stats[0]['total_attempts'], 1)
+        self.assertEqual(code_challenge_stats[0]['total_learners'], 1)
+        self.assertEqual(code_challenge_stats[0]['success_rate'], 100.0)

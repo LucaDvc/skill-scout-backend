@@ -21,6 +21,7 @@ from courses.api.lesson_steps_serializers import TextLessonStepSerializer, \
 from .serializers import CourseEnrollmentSerializer, DailyActiveUsersAnalyticsSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
     BaseLessonStep, CodeChallengeLessonStep, CodeChallengeTestCase
+from ..analytics import CourseAssessmentAnalytics
 from ..models import CourseCompletionAnalytics, DailyActiveUsersAnalytics, EngagementAnalytics
 
 
@@ -551,3 +552,12 @@ def get_course_engagement_analytics(request, course_id):
         })
 
     return Response(enriched_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_course_assessments_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+    stats = CourseAssessmentAnalytics.get_course_statistics(course)
+    return Response(stats)
