@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
-from teaching.models import LearnerQuizPerformance
+from learning.models import LearnerQuizPerformance
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
