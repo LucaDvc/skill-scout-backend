@@ -16,3 +16,9 @@ def refresh_catalog_courses_cache():
 def refresh_learner_courses_cache():
     logger.info("Refreshing the learner courses cache...")
     call_command("cache_learner_courses")
+
+
+@shared_task
+def update_daily_active_users():
+    logger.info("Updating daily active users...")
+    call_command("update_daily_active_users")
