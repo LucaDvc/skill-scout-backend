@@ -1,6 +1,6 @@
 import json
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import F, Count
+from django.db.models import F, Count, Avg, Max
 from django.http import Http404
 from rest_framework import generics, status, serializers
 from rest_framework.decorators import api_view, permission_classes
@@ -21,7 +21,7 @@ from courses.api.lesson_steps_serializers import TextLessonStepSerializer, \
 from .serializers import CourseEnrollmentSerializer, DailyActiveUsersAnalyticsSerializer
 from courses.models import Course, Chapter, Lesson, TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
     BaseLessonStep, CodeChallengeLessonStep, CodeChallengeTestCase
-from ..models import CourseCompletionAnalytics, DailyActiveUsersAnalytics
+from ..models import CourseCompletionAnalytics, DailyActiveUsersAnalytics, EngagementAnalytics
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
@@ -493,3 +493,61 @@ def get_daily_activity_analytics(request, course_id):
 
     serializer = DailyActiveUsersAnalyticsSerializer(analytics_data, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_course_engagement_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+
+    # Aggregate data
+    engagement_data = EngagementAnalytics.objects.filter(course=course).values('lesson_step').annotate(
+        average_time_spent=Avg('time_spent'),
+        learners_count=Count('learner'),
+        last_accessed=Max('last_accessed')
+    )
+
+    # Fetch all lesson steps in a single query and prefetch related lesson and chapter data
+    lesson_steps = BaseLessonStep.objects.filter(
+        id__in=[entry['lesson_step'] for entry in engagement_data]
+    ).select_related('lesson__chapter')
+
+    # Create a dictionary for quick lookup
+    lesson_steps_dict = {str(step.id): step for step in lesson_steps}
+
+    # Sort the lesson steps according to the course structure
+    sorted_lesson_steps = sorted(
+        lesson_steps,
+        key=lambda step: (
+            step.lesson.chapter.creation_date,
+            step.lesson.order,
+            step.order
+        )
+    )
+
+    # Enrich data with lesson step details
+    enriched_data = []
+    for step in sorted_lesson_steps:
+        entry = next(item for item in engagement_data if str(item['lesson_step']) == str(step.id))
+        if hasattr(step, 'text_step'):
+            lesson_step_type = 'text'
+        elif hasattr(step, 'quiz_step'):
+            lesson_step_type = 'quiz'
+        elif hasattr(step, 'video_step'):
+            lesson_step_type = 'video'
+        elif hasattr(step, 'code_challenge_step'):
+            lesson_step_type = 'codechallenge'
+        else:
+            lesson_step_type = 'unknown'
+        enriched_data.append({
+            'lesson_step_id': str(step.id),
+            'lesson_step_order': step.order,
+            'lesson_title': step.lesson.title,
+            'lesson_step_type': lesson_step_type,
+            'average_time_spent': entry['average_time_spent'],
+            'learners_count': entry['learners_count'],
+            'last_accessed': entry['last_accessed']
+        })
+
+    return Response(enriched_data)
