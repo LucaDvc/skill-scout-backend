@@ -8,9 +8,10 @@ import requests
 from django.core.files.base import ContentFile
 
 from courses.api.lesson_steps_serializers import TextLessonStepSerializer, VideoLessonStepSerializer, \
-    CodeChallengeLessonStepSerializer, QuizLessonStepSerializer, SortingProblemLessonStepSerializer
+    CodeChallengeLessonStepSerializer, QuizLessonStepSerializer, SortingProblemLessonStepSerializer, \
+    TextProblemLessonStepSerializer
 from courses.models import TextLessonStep, QuizLessonStep, VideoLessonStep, CodeChallengeLessonStep, \
-    SortingProblemLessonStep
+    SortingProblemLessonStep, TextProblemLessonStep
 
 
 class ImageOrUrlField(serializers.Field):
@@ -53,6 +54,8 @@ class LessonStepField(serializers.ListField):
                 serializer = CodeChallengeLessonStepSerializer(item.code_challenge_step, context=self.context)
             elif hasattr(item, 'sorting_problem_step'):
                 serializer = SortingProblemLessonStepSerializer(item.sorting_problem_step, context=self.context)
+            elif hasattr(item, 'text_problem_step'):
+                serializer = TextProblemLessonStepSerializer(item.text_problem_step, context=self.context)
             else:
                 raise Exception('Unknown step type')
 
@@ -81,6 +84,9 @@ class LessonStepField(serializers.ListField):
             elif step_type == 'sorting_problem':
                 serializer_class = SortingProblemLessonStepSerializer
                 model_class = SortingProblemLessonStep
+            elif step_type == 'text_problem':
+                serializer_class = TextProblemLessonStepSerializer
+                model_class = TextProblemLessonStep
             else:
                 raise serializers.ValidationError('Unknown step type')
 

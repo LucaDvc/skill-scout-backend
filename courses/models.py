@@ -142,7 +142,7 @@ class BaseLessonStep(models.Model):
     def save(self, *args, **kwargs):
         if (hasattr(self, 'text_step') + hasattr(self, 'quiz_step')
                 + hasattr(self, 'video_step') + hasattr(self, 'code_challenge_step')
-                + hasattr(self, 'sorting_problem_step') > 1):
+                + hasattr(self, 'sorting_problem_step') + hasattr(self, 'text_problem_step') > 1):
             raise ValidationError('A BaseLessonStep can only have one type of child step.')
         super().save(*args, **kwargs)
 
@@ -244,3 +244,16 @@ class SortingProblemOption(models.Model):
 
     def __str__(self):
         return self.text
+
+
+class TextProblemLessonStep(models.Model):
+    base_step = models.OneToOneField(BaseLessonStep, on_delete=models.CASCADE, primary_key=True,
+                                     related_name='text_problem_step')
+    title = models.CharField(max_length=100, null=False, blank=False)
+    statement = models.TextField(null=False, blank=False)
+    correct_answer = models.TextField(null=False, blank=False)
+    case_sensitive = models.BooleanField(default=False, null=False, blank=False)
+    allow_regex = models.BooleanField(default=False, null=False, blank=False)
+
+    def __str__(self):
+        return self.title

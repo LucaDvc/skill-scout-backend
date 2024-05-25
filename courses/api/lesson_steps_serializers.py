@@ -1,8 +1,11 @@
+import re
+
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 
 from courses.models import TextLessonStep, QuizLessonStep, QuizChoice, VideoLessonStep, \
-    BaseLessonStep, CodeChallengeTestCase, CodeChallengeLessonStep, SortingProblemOption, SortingProblemLessonStep
+    BaseLessonStep, CodeChallengeTestCase, CodeChallengeLessonStep, SortingProblemOption, SortingProblemLessonStep, \
+    TextProblemLessonStep
 from rest_framework import serializers
 from .mixins import LessonStepSerializerMixin, ValidateAllowedFieldsMixin
 from .. import cache_utils
@@ -164,7 +167,22 @@ class VideoLessonStepSerializer(serializers.ModelSerializer, LessonStepSerialize
                 attrs['video_file'] = video_file
             else:
                 raise serializers.ValidationError({"video_file": "Invalid data type for video file."})
+        elif request and request.method == 'POST':
+            video_file = request.data.get('video_file')
+            attrs['video_file'] = video_file
+
         return super().validate(attrs)
+
+    def create(self, validated_data):
+        base_step_data = validated_data.pop('base_step')
+        if isinstance(base_step_data, dict):
+            base_step_data['lesson'] = self.context['lesson']
+            base_step = BaseLessonStep.objects.create(**base_step_data)
+        else:
+            base_step = base_step_data
+        video_step = VideoLessonStep.objects.create(base_step=base_step, **validated_data)
+        # Returning the base step instance to be used in the lesson serializer
+        return base_step if isinstance(base_step_data, dict) else video_step
 
     def update(self, instance, validated_data):
         # Handle updating video step on lesson update, as well as specific video step update
@@ -307,7 +325,6 @@ class SortingProblemLessonStepSerializer(serializers.ModelSerializer, LessonStep
             base_step.save()
 
         options_data = validated_data.pop('options', [])
-        print(options_data)
         if options_data is not None:
             instance.options.all().delete()  # Clear existing quiz choices
             for option_data in options_data:
@@ -328,3 +345,53 @@ class SortingProblemLessonStepSerializer(serializers.ModelSerializer, LessonStep
         representation['type'] = 'sorting_problem'
 
         return representation
+
+
+class TextProblemLessonStepSerializer(serializers.ModelSerializer, LessonStepSerializerMixin):
+    class Meta:
+        model = TextProblemLessonStep
+        fields = ['id', 'order', 'title', 'statement', 'correct_answer', 'case_sensitive', 'allow_regex']
+
+    def create(self, validated_data):
+        base_step_data = validated_data.pop('base_step')
+        if isinstance(base_step_data, dict):
+            base_step_data['lesson'] = self.context['lesson']
+            base_step = BaseLessonStep.objects.create(**base_step_data)
+        else:
+            base_step = base_step_data
+
+        text_problem = TextProblemLessonStep.objects.create(base_step=base_step, **validated_data)
+
+        # Returning the base step instance to be used in the lesson serializer
+        return base_step if isinstance(base_step_data, dict) else text_problem
+
+    def update(self, instance, validated_data):
+        base_step_data = validated_data.pop('base_step')
+        if base_step_data:
+            base_step = instance.base_step
+            for attr, value in base_step_data.items():
+                setattr(base_step, attr, value)
+            base_step.save()
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        # Returning the base step instance to be used in the lesson serializer
+        return base_step if base_step_data else instance
+
+    def to_representation(self, obj):
+        representation = super().to_representation(obj)
+        representation['type'] = 'text_problem'
+        if self.context.get('is_learner'):
+            representation.pop('correct_answer', None)
+
+        return representation
+
+    def validate(self, data):
+        data = super().validate(data)
+        if data.get('allow_regex'):
+            try:
+                re.compile(data.get('correct_answer'))
+            except re.error:
+                raise serializers.ValidationError({"correct_answer": "This is not a valid regular expression."})
+        return data
