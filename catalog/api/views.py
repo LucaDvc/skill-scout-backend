@@ -14,8 +14,8 @@ from catalog.api.filters import MultiFieldSearchFilter, CourseFilter
 from catalog.api.serializers import DetailedCatalogCourseSerializer, SimpleCatalogCourseSerializer, \
     CategoryListSerializer, MobileCatalogCourseSerializer
 from courses import cache_utils
-from courses.api.serializers import TagSerializer
-from courses.models import Course, Category, Tag
+from courses.api.serializers import TagSerializer, CourseReviewsSerializer
+from courses.models import Course, Category, Tag, Review
 from learning.models import CourseEnrollment
 
 
@@ -143,3 +143,48 @@ class CategoryListView(generics.ListAPIView):
 class TagListView(generics.ListAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
+
+
+class CourseReviewsListView(generics.ListAPIView):
+    serializer_class = CourseReviewsSerializer
+    filter_backends = [OrderingFilter]
+    ordering_fields = ['creation_date', 'rating']
+
+    def get_queryset(self):
+        course_id = self.kwargs['course_id']
+        course = get_object_or_404(Course, id=course_id)
+        return Review.objects.filter(course=course)
+
+    def calculate_percentage(self, count, total):
+        return round((count / total * 100), 1) if total > 0 else 0
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        ordered_queryset = self.filter_queryset(queryset)
+
+        total_reviews = ordered_queryset.count()
+        avg_rating = ordered_queryset.aggregate(Avg('rating'))['rating__avg'] or 0
+        avg_rating = round(avg_rating, 1)
+
+        rating_counts = ordered_queryset.values('rating').annotate(count=Count('rating')).order_by('rating')
+
+        counts = {i: 0 for i in range(1, 6)}
+        for rc in rating_counts:
+            counts[int(rc['rating'])] = rc['count']
+
+        percentage_five_star = self.calculate_percentage(counts[5], total_reviews)
+        percentage_four_star = self.calculate_percentage(counts[4], total_reviews)
+        percentage_three_star = self.calculate_percentage(counts[3], total_reviews)
+        percentage_two_star = self.calculate_percentage(counts[2], total_reviews)
+        percentage_one_star = self.calculate_percentage(counts[1], total_reviews)
+
+        serializer = self.get_serializer({
+            'reviews': ordered_queryset,
+            'avg_rating': avg_rating,
+            'percentage_five_star': percentage_five_star,
+            'percentage_four_star': percentage_four_star,
+            'percentage_three_star': percentage_three_star,
+            'percentage_two_star': percentage_two_star,
+            'percentage_one_star': percentage_one_star
+        })
+        return Response(serializer.data)

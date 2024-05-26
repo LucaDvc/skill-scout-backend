@@ -120,6 +120,16 @@ class ReviewSerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
         fields = ['id', 'learner', 'rating', 'comment', 'creation_date']
 
 
+class CourseReviewsSerializer(serializers.Serializer):
+    avg_rating = serializers.FloatField()
+    percentage_five_star = serializers.FloatField()
+    percentage_four_star = serializers.FloatField()
+    percentage_three_star = serializers.FloatField()
+    percentage_two_star = serializers.FloatField()
+    percentage_one_star = serializers.FloatField()
+    reviews = ReviewSerializer(many=True)
+
+
 class CategorySerializer(serializers.ModelSerializer, ValidateAllowedFieldsMixin):
     class Meta:
         model = Category

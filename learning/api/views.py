@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from rest_framework.filters import OrderingFilter
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
@@ -276,6 +277,8 @@ def complete_lesson_step(request, step_id):
 class ReviewListCreateView(generics.ListCreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [OrderingFilter]
+    ordering_fields = ['creation_date', 'rating']
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
