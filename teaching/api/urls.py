@@ -40,7 +40,8 @@ urlpatterns = [
     path('code-challenge-steps/<uuid:pk>/', views.CodeChallengeLessonStepRetrieveUpdateDestroyView.as_view(),
          name='code-challenge-step-retrieve-update-destroy'),
 
-    path('code-challenge-steps/<uuid:code_challenge_id>/test_cases/', views.CodeChallengeTestCaseListCreateView.as_view(),
+    path('code-challenge-steps/<uuid:code_challenge_id>/test_cases/',
+         views.CodeChallengeTestCaseListCreateView.as_view(),
          name='test-case-list-create'),
     path('test_cases/<int:pk>/', views.CodeChallengeTestCaseRetrieveUpdateDestroyView.as_view(),
          name='test-case-retrieve-update-destroy'),
@@ -48,8 +49,10 @@ urlpatterns = [
     path('analytics/<uuid:course_id>/enrollment/', views.get_enrollment_analytics, name='enrollment-analytics'),
     path('analytics/<uuid:course_id>/completion/', views.get_course_completion_analytics, name='completion-analytics'),
     path('analytics/<uuid:course_id>/activity/', views.get_daily_activity_analytics, name='activity-analytics'),
-    path('analytics/<uuid:course_id>/engagement/', views.get_course_engagement_analytics,
-         name='course-engagement-analytics'),
+    path('analytics/<uuid:course_id>/steps-engagement/', views.get_lesson_steps_engagement_analytics,
+         name='steps-engagement-analytics'),
+    path('analytics/<uuid:course_id>/lessons-engagement/', views.get_lessons_engagement_analytics,
+         name='lessons-engagement-analytics'),
     path('analytics/<uuid:course_id>/assessments/', views.get_course_assessments_analytics,
          name='assessments-analytics'),
 ]

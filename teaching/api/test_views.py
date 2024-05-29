@@ -299,51 +299,66 @@ class GetCourseEngagementAnalyticsTest(APITestCase):
             last_name='Test'
         )
 
-        # Create a course, chapter & lesson
+        # Create a course, chapter & lessons
         self.course = Course.objects.create(
             title='Test Course', instructor=self.user, release_date=timezone.now() - timedelta(days=60)
         )
         self.chapter = Chapter.objects.create(course=self.course, title='Chapter 1')
-        self.lesson = Lesson.objects.create(chapter=self.chapter, title=f'Lesson 1', order=1)
-
-        # Create BaseLessonStep and EngagementAnalytics data
-        self.lesson_steps = [
-            BaseLessonStep.objects.create(lesson=self.lesson, order=i+1)
+        self.lessons = [
+            Lesson.objects.create(chapter=self.chapter, title=f'Lesson {i+1}', order=i+1)
             for i in range(3)
         ]
 
-        for i, step in enumerate(self.lesson_steps):
-            EngagementAnalytics.objects.create(
-                learner=self.user,
-                course=self.course,
-                lesson_step=step,
-                time_spent=timedelta(minutes=30 * (i + 1)),
-                last_accessed=timezone.now() - timedelta(days=i)
-            )
+        # Create BaseLessonStep and EngagementAnalytics data
+        self.lesson_steps = []
+        for lesson in self.lessons:
+            for i in range(3):  # Each lesson has 3 steps
+                step = BaseLessonStep.objects.create(lesson=lesson, order=i+1)
+                self.lesson_steps.append(step)
+                EngagementAnalytics.objects.create(
+                    learner=self.user,
+                    course=self.course,
+                    lesson_step=step,
+                    time_spent=timedelta(minutes=30 * (i + 1)),
+                    last_accessed=timezone.now() - timedelta(days=i)
+                )
 
-        # Set the URL
-        self.url = reverse('course-engagement-analytics', kwargs={'course_id': self.course.id})
-
-    def test_get_course_engagement_analytics(self):
+    def test_get_lesson_steps_engagement_analytics(self):
+        url = reverse('steps-engagement-analytics', kwargs={'course_id': self.course.id})
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(self.url)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 3)
+        self.assertEqual(len(response.data), 9)
 
-        # Check the values of active_users and other fields
+        # Check the values of lesson steps and other fields
         for i, entry in enumerate(response.data):
             lesson_step = self.lesson_steps[i]
             self.assertEqual(entry['lesson_step_id'], str(lesson_step.id))
             self.assertEqual(entry['lesson_step_order'], lesson_step.order)
             self.assertEqual(entry['lesson_title'], lesson_step.lesson.title)
-            self.assertEqual(entry['average_time_spent'].total_seconds(), 1800 * (i + 1))
+            self.assertEqual(entry['average_time_spent'].total_seconds(), 1800 * (i % 3 + 1))
             self.assertEqual(entry['learners_count'], 1)
             self.assertIn('lesson_step_type', entry)
             self.assertIn('last_accessed', entry)
 
-    def test_get_course_engagement_analytics_no_authentication(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    def test_get_lessons_engagement_analytics(self):
+        url = reverse('lessons-engagement-analytics', kwargs={'course_id': self.course.id})
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+
+        # Check the values of average_time_spent and other fields
+        for i, entry in enumerate(response.data):
+            lesson = self.lessons[i]
+            lesson_steps = [step for step in self.lesson_steps if step.lesson == lesson]
+            avg_time_spent = sum((step.engagementanalytics_set.first().time_spent.total_seconds() for step in lesson_steps)) / len(lesson_steps)
+            self.assertEqual(entry['lesson_id'], str(lesson.id))
+            self.assertEqual(entry['lesson_order'], lesson.order)
+            self.assertEqual(entry['lesson_title'], lesson.title)
+            self.assertAlmostEqual(entry['average_time_spent'].total_seconds(), avg_time_spent, delta=1)
+            self.assertEqual(entry['learners_count'], 1)  # All steps have the same single learner
+            self.assertIn('last_accessed', entry)
 
 
 class CourseAssessmentAnalyticsTest(APITestCase):

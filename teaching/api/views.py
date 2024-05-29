@@ -449,7 +449,10 @@ def get_enrollment_analytics(request, course_id):
 
     enrollment_data = list(enrollment_counts_by_date)
 
-    return Response(enrollment_data)
+    return Response({
+        'total_enrollments': course.enrolled_learners.count(),
+        'enrollment_data': enrollment_data
+    })
 
 
 @api_view(['GET'])
@@ -498,7 +501,7 @@ def get_daily_activity_analytics(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_course_engagement_analytics(request, course_id):
+def get_lesson_steps_engagement_analytics(request, course_id):
     instructor = request.user
     course = get_object_or_404(Course, id=course_id, instructor=instructor)
 
@@ -544,8 +547,52 @@ def get_course_engagement_analytics(request, course_id):
         enriched_data.append({
             'lesson_step_id': str(step.id),
             'lesson_step_order': step.order,
-            'lesson_title': step.lesson.title,
             'lesson_step_type': lesson_step_type,
+            'lesson_id': str(step.lesson.id),
+            'lesson_title': step.lesson.title,
+            'average_time_spent': entry['average_time_spent'],
+            'learners_count': entry['learners_count'],
+            'last_accessed': entry['last_accessed']
+        })
+
+    return Response(enriched_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_lessons_engagement_analytics(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+
+    # Aggregate data by lesson
+    engagement_data = EngagementAnalytics.objects.filter(course=course).values('lesson_step__lesson').annotate(
+        average_time_spent=Avg('time_spent'),
+        learners_count=Count('learner', distinct=True),
+        last_accessed=Max('last_accessed')
+    )
+
+    # Fetch all lessons in a single query and prefetch related chapter data
+    lessons = Lesson.objects.filter(
+        id__in=[entry['lesson_step__lesson'] for entry in engagement_data]
+    ).select_related('chapter')
+
+    # Sort the lessons according to the course structure
+    sorted_lessons = sorted(
+        lessons,
+        key=lambda l: (
+            l.chapter.creation_date,
+            l.order
+        )
+    )
+
+    # Enrich data with lesson details
+    enriched_data = []
+    for lesson in sorted_lessons:
+        entry = next(item for item in engagement_data if str(item['lesson_step__lesson']) == str(lesson.id))
+        enriched_data.append({
+            'lesson_id': str(lesson.id),
+            'lesson_order': lesson.order,
+            'lesson_title': lesson.title,
             'average_time_spent': entry['average_time_spent'],
             'learners_count': entry['learners_count'],
             'last_accessed': entry['last_accessed']
