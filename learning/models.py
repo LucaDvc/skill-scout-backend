@@ -81,14 +81,14 @@ class TestResult(models.Model):
         unique_together = ['submission', 'test_case']
 
 
-class LearnerQuizPerformance(models.Model):
+class LearnerAssessmentStepPerformance(models.Model):
     learner = models.ForeignKey('users.User', on_delete=models.CASCADE)
-    quiz_step = models.ForeignKey('courses.QuizLessonStep', on_delete=models.CASCADE)
+    base_step = models.ForeignKey('courses.BaseLessonStep', on_delete=models.CASCADE)
     attempts = models.PositiveIntegerField(default=1)
     passed = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ['learner', 'quiz_step']
+        unique_together = ['learner', 'base_step']
 
     def __str__(self):
-        return f'{self.learner} - {self.quiz_step} - {"Correct" if self.passed else "Incorrect"}'
+        return f'{self.learner} - {self.base_step} - {"Correct" if self.passed else "Incorrect"}'

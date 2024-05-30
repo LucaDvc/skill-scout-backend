@@ -43,7 +43,7 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
         code_challenge_submission.submitted_code = code
         code_challenge_submission.error_message = None
         if not created:
-            code_challenge_submission.attempts += 1
+            initial_attempts = code_challenge_submission.attempts
         code_challenge_submission.save()
 
     batch_size = 20
@@ -118,10 +118,18 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
                     break
 
             submission_tokens = [token for token in submission_tokens if token not in tokens_to_remove]
-            time.sleep(2)
+            time.sleep(1)
 
         if not all_results_received:
+            # Rollback attempts count to the initial state
+            if not created:
+                code_challenge_submission.attempts = initial_attempts
+                code_challenge_submission.save()
             raise self.retry(countdown=2)
+
+    # Increment attempts only if all batches processed successfully
+    if not created:
+        code_challenge_submission.attempts += 1
 
     code_challenge_submission.update_passed_status()
     return CodeChallengeSubmissionSerializer(code_challenge_submission).data
