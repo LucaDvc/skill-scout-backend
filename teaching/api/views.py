@@ -429,7 +429,67 @@ class CourseEnrolledLearnersListView(generics.ListAPIView):
         course = get_object_or_404(courses, id=course_id)
         return CourseEnrollment.objects.filter(course=course)
 
-# TODO: ENDPOINT TO PUBLISH COURSE, WITH VALIDATION OF THE USER PROFILE (CAN'T BE PRIVATE), OTHER VALIDATIONS
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def publish_course(request, course_id):
+    instructor = request.user
+    course = get_object_or_404(Course, id=course_id, instructor=instructor)
+
+    chapters = course.chapter_set.all()
+
+    # Course should have at least 2 chapters, 10 lessons
+    # and 10 assignment steps (quiz, code challenge, sorting problem, text problem)
+    if chapters.count() < 2:
+        return Response({'detail': 'The course must have at least 2 chapters to be published'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    lessons = Lesson.objects.filter(chapter__course=course)
+    if lessons.count() < 10:
+        return Response({'detail': 'The course must have at least 10 lessons to be published'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    assignment_steps = BaseLessonStep.objects.filter(lesson__chapter__course=course).exclude(
+        text_problem_step=None, quiz_step=None, code_challenge_step=None, sorting_problem_step=None)
+    if assignment_steps.count() < 10:
+        return Response({'detail': 'The course must have at least 10 assignment steps to be published'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Course should not have empty modules (chapters without lessons)
+    empty_chapters = chapters.filter(lesson=None)
+    if empty_chapters.exists():
+        return Response({
+            'detail': 'Course has empty chapters. Please add lessons to all chapters or remove the empty chapters before publishing'},
+            status=status.HTTP_400_BAD_REQUEST)
+
+    # All videos in video steps should have a video URL
+    video_steps = VideoLessonStep.objects.filter(base_step__lesson__chapter__course=course)
+    for step in video_steps:
+        if not step.video_file:
+            return Response({
+                'detail': 'All video steps should have a video URL before publishing the course'},
+                status=status.HTTP_400_BAD_REQUEST)
+
+    # Logo is uploaded (not default image)
+    if not course.image or course.image.name == 'courses/images/default.jpg':
+        return Response({'detail': 'Course logo must be uploaded before publishing the course'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Intro is more than 100 chars long
+    if len(course.intro) < 100:
+        return Response({'detail': 'Course summary should be at least 100 characters long'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Category must be set
+    if not course.category:
+        return Response({'detail': 'Category must be set for the course before publishing'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    course.active = True
+    if not course.release_date:
+        course.release_date = datetime.now()
+    course.save()
+    return Response({'detail': 'Course published successfully'})
 
 
 @api_view(['GET'])

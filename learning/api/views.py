@@ -10,7 +10,7 @@ from rest_framework.filters import OrderingFilter
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
-from learning.models import LearnerQuizPerformance
+from learning.models import LearnerAssessmentStepPerformance
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
@@ -189,9 +189,9 @@ def submit_quiz(request, pk):
 
     is_correct = submitted_choices == correct_choices
 
-    performance, created = LearnerQuizPerformance.objects.get_or_create(
+    performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
         learner=user,
-        quiz_step=quiz_step,
+        base_step=quiz_step.base_step,
         defaults={'passed': is_correct, 'attempts': 1}
     )
 
