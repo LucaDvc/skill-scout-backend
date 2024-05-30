@@ -322,3 +322,51 @@ def get_user_course_review(request, course_id):
         return Response({'detail': 'Review not found'}, status=status.HTTP_404_NOT_FOUND)
     serializer = ReviewSerializer(review)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FavouriteCoursesListView(generics.ListAPIView, LearnerCourseViewMixin):
+    serializer_class = LearnerCourseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        user = self.request.user
+        favourite_course_ids = (CourseEnrollment.objects
+                                .filter(learner=user, favourite=True)
+                                .values_list('course', flat=True))
+        favourite_courses = Course.objects.filter(id__in=favourite_course_ids)
+
+        serialized_courses = []
+        for course in favourite_courses:
+            course_data = self.get_course_data(course)
+            serialized_courses.append(course_data)
+
+        return Response(serialized_courses)
+
+    def post(self, request, *args, **kwargs):
+        action = request.data.get('action')
+        course_id = request.data.get('course_id')
+
+        if not course_id:
+            return Response({'error': 'course_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            course_id = UUID(course_id)
+        except ValueError:
+            return Response({'error': 'Invalid course ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+        course_enrollment = CourseEnrollment.objects.filter(course_id=course_id, learner=request.user).first()
+
+        if not course_enrollment:
+            return Response({'error': 'You must be enrolled in this course to modify its favorite status'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if action == 'add':
+            course_enrollment.favourite = True
+            course_enrollment.save()
+            return Response({'detail': 'Course added to favorites'}, status=status.HTTP_200_OK)
+        elif action == 'remove':
+            course_enrollment.favourite = False
+            course_enrollment.save()
+            return Response({'detail': 'Course removed from favorites'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)

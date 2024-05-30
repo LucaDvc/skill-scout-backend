@@ -16,5 +16,7 @@ urlpatterns = [
 
     path('courses/<uuid:course_id>/reviews/', views.ReviewListCreateView.as_view(), name='review-list-create'),
     path('reviews/<uuid:pk>/', views.ReviewRetrieveUpdateDestroyView.as_view(), name='review-retrieve-update-destroy'),
-    path('courses/<uuid:course_id>/user-review/', views.get_user_course_review, name='get-user-course-review')
+    path('courses/<uuid:course_id>/user-review/', views.get_user_course_review, name='get-user-course-review'),
+
+    path('courses/favourites/', views.FavouriteCoursesListView.as_view(), name='favourite-courses-list'),
 ]
