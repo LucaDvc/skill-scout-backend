@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, Value, F
+from django.db.models import Avg, Count, Value, F, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django_filters import rest_framework as filters
 
@@ -26,12 +26,17 @@ class BaseCatalogCourseListView(generics.ListAPIView):
     filterset_class = CourseFilter
 
     def get_queryset(self):
+        # Create a subquery to count reviews accurately
+        review_count_subquery = Review.objects.filter(course=OuterRef('pk')).values('course').annotate(
+            count=Count('pk')).values('count')
+
         return (Course.objects.filter(active=True)
                 .annotate(avg_rating=Coalesce(Avg('review__rating'), Value(0.0)))
                 .annotate(enrolled_learners_count=Count('enrolled_learners', distinct=True))
-                .annotate(reviews_no=Count('review')))
+                .annotate(reviews_no=Coalesce(Subquery(review_count_subquery), Value(0))))
 
     def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
         ordering = self.request.query_params.get("ordering", "")
         if ordering.lstrip('-') == 'enrolled_learners':
             ordering = '-enrolled_learners_count' if ordering.startswith('-') else 'enrolled_learners_count'
@@ -47,9 +52,6 @@ class BaseCatalogCourseListView(generics.ListAPIView):
                 field_name = ordering
                 # For fields that may have null values, specify nulls_first=True for ascending order
                 queryset = queryset.order_by(F(field_name).asc(nulls_first=True))
-        else:
-            # Apply default filtering and ordering
-            queryset = super().filter_queryset(queryset)
 
         return queryset
 
