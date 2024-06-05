@@ -19,4 +19,6 @@ urlpatterns = [
     path('courses/<uuid:course_id>/user-review/', views.get_user_course_review, name='get-user-course-review'),
 
     path('courses/favourites/', views.FavouriteCoursesListView.as_view(), name='favourite-courses-list'),
+
+    path('analytics/engagement/', views.send_engagement_data, name='send-step-engagement'),
 ]

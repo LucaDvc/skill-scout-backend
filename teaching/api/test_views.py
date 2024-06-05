@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
-from learning.models import LearnerQuizPerformance, CodeChallengeSubmission
+from learning.models import LearnerAssessmentStepPerformance, CodeChallengeSubmission
 from teaching.models import DailyActiveUsersAnalytics, EngagementAnalytics
 from users.models import User
 from courses.models import Course, Category, Tag, Chapter, Lesson, BaseLessonStep, TextLessonStep, ProgrammingLanguage, \
@@ -425,9 +425,9 @@ class CourseAssessmentAnalyticsTest(APITestCase):
         )
 
         # Create LearnerQuizPerformance
-        self.learner_quiz_performance = LearnerQuizPerformance.objects.create(
+        self.learner_quiz_performance = LearnerAssessmentStepPerformance.objects.create(
             learner=self.user,
-            quiz_step=self.quiz_lesson_step,
+            base_step=self.quiz_lesson_step.base_step,
             attempts=1,
             passed=True
         )
@@ -451,10 +451,11 @@ class CourseAssessmentAnalyticsTest(APITestCase):
         # Check quiz statistics
         quiz_stats = response.data['quiz_statistics']
         self.assertEqual(len(quiz_stats), 1)
-        self.assertEqual(quiz_stats[0]['chapter'], self.chapter.title)
-        self.assertEqual(quiz_stats[0]['lesson'], self.lesson.title)
+        self.assertEqual(quiz_stats[0]['lesson_id'], self.lesson.id)
+        self.assertEqual(quiz_stats[0]['lesson_title'], self.lesson.title)
         self.assertEqual(quiz_stats[0]['step_order'], self.quiz_base_lesson_step.order)
         self.assertEqual(quiz_stats[0]['step_id'], self.quiz_base_lesson_step.id)
+        self.assertEqual(quiz_stats[0]['step_type'], 'Quiz')
         self.assertEqual(quiz_stats[0]['total_attempts'], 1)
         self.assertEqual(quiz_stats[0]['total_learners'], 1)
         self.assertEqual(quiz_stats[0]['success_rate'], 100.0)
@@ -462,10 +463,11 @@ class CourseAssessmentAnalyticsTest(APITestCase):
         # Check code challenge statistics
         code_challenge_stats = response.data['code_challenge_statistics']
         self.assertEqual(len(code_challenge_stats), 1)
-        self.assertEqual(code_challenge_stats[0]['chapter'], self.chapter.title)
-        self.assertEqual(code_challenge_stats[0]['lesson'], self.lesson.title)
+        self.assertEqual(code_challenge_stats[0]['lesson_id'], self.lesson.id)
+        self.assertEqual(code_challenge_stats[0]['lesson_title'], self.lesson.title)
         self.assertEqual(code_challenge_stats[0]['step_order'], self.code_base_lesson_step.order)
         self.assertEqual(code_challenge_stats[0]['step_id'], self.code_base_lesson_step.id)
+        self.assertEqual(code_challenge_stats[0]['step_type'], 'Code Challenge')
         self.assertEqual(code_challenge_stats[0]['total_attempts'], 1)
         self.assertEqual(code_challenge_stats[0]['total_learners'], 1)
         self.assertEqual(code_challenge_stats[0]['success_rate'], 100.0)

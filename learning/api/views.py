@@ -1,3 +1,4 @@
+from datetime import timedelta
 from uuid import UUID
 
 from celery.result import AsyncResult
@@ -11,6 +12,7 @@ from rest_framework.filters import OrderingFilter
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
 from learning.models import LearnerAssessmentStepPerformance
+from teaching.models import EngagementAnalytics
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
@@ -370,3 +372,28 @@ class FavouriteCoursesListView(generics.ListAPIView, LearnerCourseViewMixin):
             return Response({'detail': 'Course removed from favorites'}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_engagement_data(request):
+    user = request.user
+
+    step_id = request.data.get('step_id')
+    if not step_id:
+        return Response({'detail': 'step_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    step = get_object_or_404(BaseLessonStep, id=step_id)
+
+    course = step.lesson.chapter.course
+    if not course.enrolled_learners.filter(id=user.id).exists():
+        return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+    engagement, created = EngagementAnalytics.objects.get_or_create(learner=user, lesson_step=step,
+                                                                    defaults={'course': course,
+                                                                              'time_spent': timedelta()})
+    seconds = int(request.data.get('time_spent', 0))
+    duration = timedelta(seconds=seconds)
+    engagement.time_spent += duration
+    engagement.save()
+
+    return Response({'detail': 'Engagement data sent'}, status=status.HTTP_200_OK)

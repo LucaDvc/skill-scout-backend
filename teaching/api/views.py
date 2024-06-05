@@ -594,6 +594,7 @@ def get_lesson_steps_engagement_analytics(request, course_id):
     enriched_data = []
     for step in sorted_lesson_steps:
         entry = next(item for item in engagement_data if str(item['lesson_step']) == str(step.id))
+        average_time_spent = entry['average_time_spent'].total_seconds() if entry['average_time_spent'] else 0
         if hasattr(step, 'text_step'):
             lesson_step_type = 'text'
         elif hasattr(step, 'quiz_step'):
@@ -610,7 +611,7 @@ def get_lesson_steps_engagement_analytics(request, course_id):
             'lesson_step_type': lesson_step_type,
             'lesson_id': str(step.lesson.id),
             'lesson_title': step.lesson.title,
-            'average_time_spent': entry['average_time_spent'],
+            'average_time_spent': average_time_spent,
             'learners_count': entry['learners_count'],
             'last_accessed': entry['last_accessed']
         })
@@ -649,11 +650,12 @@ def get_lessons_engagement_analytics(request, course_id):
     enriched_data = []
     for lesson in sorted_lessons:
         entry = next(item for item in engagement_data if str(item['lesson_step__lesson']) == str(lesson.id))
+        average_time_spent = entry['average_time_spent'].total_seconds() if entry['average_time_spent'] else 0
         enriched_data.append({
             'lesson_id': str(lesson.id),
             'lesson_order': lesson.order,
             'lesson_title': lesson.title,
-            'average_time_spent': entry['average_time_spent'],
+            'average_time_spent': average_time_spent,
             'learners_count': entry['learners_count'],
             'last_accessed': entry['last_accessed']
         })
