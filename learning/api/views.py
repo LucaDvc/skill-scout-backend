@@ -8,6 +8,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
+from rest_framework.views import APIView
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
@@ -58,29 +59,6 @@ class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
         course_data = self.get_course_data(course)
 
         return Response(course_data)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_quiz_step(request, pk):
-    user = request.user
-
-    try:
-        quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
-            base_step_id=pk,
-            base_step__lesson__chapter__course__enrolled_learners=user
-        )
-        course_id = quiz_step.base_step.lesson.chapter.course_id
-    except QuizLessonStep.DoesNotExist:
-        return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
-    if not learner_progress or not quiz_step.base_step_id in learner_progress.completed_steps:
-        quiz_data = QuizLessonStepSerializer(quiz_step, context={'is_learner': True}).data
-    else:
-        quiz_data = QuizLessonStepSerializer(quiz_step).data
-
-    return Response(quiz_data)
 
 
 @api_view(['POST'])
@@ -158,56 +136,78 @@ def check_code_challenge_result(request, task_id):
         return Response({'status': states.PENDING})
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def submit_quiz(request, pk):
-    user = request.user
-    try:
-        quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
-            base_step_id=pk,
-            base_step__lesson__chapter__course__enrolled_learners=user
+class QuizStepView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_quiz_step(self, pk, user):
+        try:
+            quiz_step = QuizLessonStep.objects.prefetch_related('quizchoice_set').get(
+                base_step_id=pk,
+                base_step__lesson__chapter__course__enrolled_learners=user
+            )
+        except QuizLessonStep.DoesNotExist:
+            return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return quiz_step
+
+    def get(self, request, pk):
+        user = request.user
+
+        quiz_step = self.get_quiz_step(pk, user)
+        course_id = quiz_step.base_step.lesson.chapter.course_id
+
+        learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
+        if not (learner_progress and quiz_step.base_step_id in learner_progress.completed_steps):
+            quiz_data = QuizLessonStepSerializer(quiz_step, context={'is_learner': True}).data
+        else:
+            quiz_data = QuizLessonStepSerializer(quiz_step).data
+
+        return Response(quiz_data)
+
+    def post(self, request, pk):
+        user = request.user
+
+        quiz_step = self.get_quiz_step(pk, user)
+
+        answer_ids = request.data.get('quiz_choices')
+        if not isinstance(answer_ids, list) or not answer_ids:
+            return Response({'error': 'quiz_choices must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure all elements UUIDs
+        try:
+            submitted_choices = set(UUID(choice_id) for choice_id in answer_ids)
+        except (ValueError, AttributeError):
+            return Response({'error': 'All quiz_choices must be valid UUID strings'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        quiz_choices = quiz_step.quizchoice_set.all()
+
+        # Set of all valid choice UUIDs for this quiz
+        valid_choice_ids = {str(choice.id) for choice in quiz_choices}
+        if not all(choice_id in valid_choice_ids for choice_id in answer_ids):
+            return Response({'error': 'One or more quiz_choices are invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        correct_choices = set(quiz_choices.filter(correct=True).values_list('id', flat=True))  # Correct choice UUIDs
+
+        is_correct = submitted_choices == correct_choices
+
+        performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
+            learner=user,
+            base_step=quiz_step.base_step,
+            defaults={'passed': is_correct, 'attempts': 1}
         )
-    except QuizLessonStep.DoesNotExist:
-        return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    answer_ids = request.data.get('quiz_choices')
-    if not isinstance(answer_ids, list) or not answer_ids:
-        return Response({'error': 'quiz_choices must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+        if not created and not performance.passed:
+            performance.attempts += 1
+            performance.passed = is_correct
+            performance.save()
 
-    # Ensure all elements UUIDs
-    try:
-        submitted_choices = set(UUID(choice_id) for choice_id in answer_ids)
-    except (ValueError, AttributeError):
-        return Response({'error': 'All quiz_choices must be valid UUID strings'}, status=status.HTTP_400_BAD_REQUEST)
+        if is_correct:
+            response_data = {'detail': 'Correct answer'}
+        else:
+            response_data = {'detail': 'Incorrect answer'}
 
-    quiz_choices = quiz_step.quizchoice_set.all()
-
-    # Set of all valid choice UUIDs for this quiz
-    valid_choice_ids = {str(choice.id) for choice in quiz_choices}
-    if not all(choice_id in valid_choice_ids for choice_id in answer_ids):
-        return Response({'error': 'One or more quiz_choices are invalid'}, status=status.HTTP_400_BAD_REQUEST)
-
-    correct_choices = set(quiz_choices.filter(correct=True).values_list('id', flat=True))  # Correct choice UUIDs
-
-    is_correct = submitted_choices == correct_choices
-
-    performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
-        learner=user,
-        base_step=quiz_step.base_step,
-        defaults={'passed': is_correct, 'attempts': 1}
-    )
-
-    if not created:
-        performance.attempts += 1
-        performance.passed = is_correct
-        performance.save()
-
-    if is_correct:
-        response_data = {'detail': 'Correct answer'}
-    else:
-        response_data = {'detail': 'Incorrect answer'}
-
-    return Response(response_data, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 def get_next_step(lesson_step):
