@@ -12,6 +12,7 @@ urlpatterns = [
     path('progress/steps/<uuid:step_id>/', views.complete_lesson_step, name='complete-lesson-step'),
 
     path('quiz-steps/<uuid:pk>/', views.QuizStepView.as_view(), name='quiz-read-submit'),
+    path('sorting-steps/<uuid:pk>/', views.SortingStepView.as_view(), name='sorting-read-submit'),
 
     path('courses/<uuid:course_id>/reviews/', views.ReviewListCreateView.as_view(), name='review-list-create'),
     path('reviews/<uuid:pk>/', views.ReviewRetrieveUpdateDestroyView.as_view(), name='review-retrieve-update-destroy'),

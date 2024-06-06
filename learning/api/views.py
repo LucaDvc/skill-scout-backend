@@ -10,13 +10,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.views import APIView
 
-from courses.api.lesson_steps_serializers import QuizLessonStepSerializer
+from courses.api.lesson_steps_serializers import QuizLessonStepSerializer, SortingProblemLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
 from learning.models import LearnerAssessmentStepPerformance
 from teaching.models import EngagementAnalytics
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
-from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review
+from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review, \
+    SortingProblemLessonStep
 from rest_framework.permissions import IsAuthenticated
 
 from learning.models import LearnerProgress, CourseEnrollment
@@ -194,6 +195,71 @@ class QuizStepView(APIView):
         performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
             learner=user,
             base_step=quiz_step.base_step,
+            defaults={'passed': is_correct, 'attempts': 1}
+        )
+
+        if not created and not performance.passed:
+            performance.attempts += 1
+            performance.passed = is_correct
+            performance.save()
+
+        if is_correct:
+            response_data = {'detail': 'Correct answer'}
+        else:
+            response_data = {'detail': 'Incorrect answer'}
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class SortingStepView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_sorting_step(self, pk, user):
+        try:
+            sorting_step = SortingProblemLessonStep.objects.prefetch_related('options').get(
+                base_step_id=pk,
+                base_step__lesson__chapter__course__enrolled_learners=user
+            )
+        except SortingProblemLessonStep.DoesNotExist:
+            return Response({'detail': 'sorting problem not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return sorting_step
+
+    def get(self, request, pk):
+        user = request.user
+
+        sorting_step = self.get_sorting_step(pk, user)
+        course_id = sorting_step.base_step.lesson.chapter.course_id
+
+        learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
+        if not (learner_progress and sorting_step.base_step_id in learner_progress.completed_steps):
+            sorting_data = SortingProblemLessonStepSerializer(sorting_step, context={'is_learner': True}).data
+        else:
+            sorting_data = SortingProblemLessonStepSerializer(sorting_step).data
+
+        return Response(sorting_data)
+
+    def post(self, request, pk):
+        user = request.user
+
+        sorting_step = self.get_sorting_step(pk, user)
+
+        answer = request.data.get('ordered_options')
+        if not isinstance(answer, list) or not answer:
+            return Response({'error': 'ordered_options must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure all elements are integers
+        try:
+            submitted_order = [int(order) for order in answer]
+        except (ValueError, AttributeError):
+            return Response({'error': 'All ordered options must be valid integers'}, status=status.HTTP_400_BAD_REQUEST)
+
+        correct_order = list(sorting_step.options.values_list('id', flat=True))
+        is_correct = submitted_order == correct_order
+
+        performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
+            learner=user,
+            base_step=sorting_step.base_step,
             defaults={'passed': is_correct, 'attempts': 1}
         )
 
