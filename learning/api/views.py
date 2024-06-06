@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from uuid import UUID
 
@@ -6,18 +7,19 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.filters import OrderingFilter
 from rest_framework.views import APIView
 
-from courses.api.lesson_steps_serializers import QuizLessonStepSerializer, SortingProblemLessonStepSerializer
+from courses.api.lesson_steps_serializers import QuizLessonStepSerializer, SortingProblemLessonStepSerializer, \
+    TextProblemLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
 from learning.models import LearnerAssessmentStepPerformance
 from teaching.models import EngagementAnalytics
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
 from courses.models import Course, CodeChallengeLessonStep, BaseLessonStep, QuizLessonStep, Review, \
-    SortingProblemLessonStep
+    SortingProblemLessonStep, TextProblemLessonStep
 from rest_framework.permissions import IsAuthenticated
 
 from learning.models import LearnerProgress, CourseEnrollment
@@ -147,7 +149,7 @@ class QuizStepView(APIView):
                 base_step__lesson__chapter__course__enrolled_learners=user
             )
         except QuizLessonStep.DoesNotExist:
-            return Response({'detail': 'quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound('Quiz not found')
 
         return quiz_step
 
@@ -211,6 +213,72 @@ class QuizStepView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+class TextProblemView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_text_problem(self, pk, user):
+        try:
+            text_problem = TextProblemLessonStep.objects.get(
+                base_step_id=pk,
+                base_step__lesson__chapter__course__enrolled_learners=user
+            )
+        except TextProblemLessonStep.DoesNotExist:
+            raise NotFound('Text problem not found')
+
+        return text_problem
+
+    def get(self, request, pk):
+        user = request.user
+
+        text_problem = self.get_text_problem(pk, user)
+        course_id = text_problem.base_step.lesson.chapter.course_id
+
+        learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
+        if not (learner_progress and text_problem.base_step_id in learner_progress.completed_steps):
+            text_problem_data = TextProblemLessonStepSerializer(text_problem, context={'is_learner': True}).data
+        else:
+            text_problem_data = TextProblemLessonStepSerializer(text_problem).data
+
+        return Response(text_problem_data)
+
+    def post(self, request, pk):
+        user = request.user
+
+        answer = request.data.get('answer')
+        if not answer:
+            return Response({'error': 'answer is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        text_problem = self.get_text_problem(pk, user)
+
+        if text_problem.allow_regex:
+            pattern = text_problem.correct_answer
+            if not text_problem.case_sensitive:
+                pattern = '(?i)' + pattern  # Adding case-insensitive flag to regex
+            is_correct = bool(re.compile(pattern).match(answer))
+        elif text_problem.case_sensitive:
+            is_correct = answer == text_problem.correct_answer
+        else:
+            is_correct = answer.lower() == text_problem.correct_answer.lower()
+
+        performance, created = LearnerAssessmentStepPerformance.objects.get_or_create(
+            learner=user,
+            base_step=text_problem.base_step,
+            defaults={'passed': is_correct, 'attempts': 1}
+        )
+
+        if not created and not performance.passed:
+            performance.attempts += 1
+            performance.passed = is_correct
+            performance.save()
+
+        if is_correct:
+            response_data = {'detail': 'Correct answer'}
+        else:
+            response_data = {'detail': 'Incorrect answer'}
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 class SortingStepView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -221,7 +289,7 @@ class SortingStepView(APIView):
                 base_step__lesson__chapter__course__enrolled_learners=user
             )
         except SortingProblemLessonStep.DoesNotExist:
-            return Response({'detail': 'sorting problem not found'}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound('Sorting problem not found')
 
         return sorting_step
 

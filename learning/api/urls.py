@@ -13,6 +13,7 @@ urlpatterns = [
 
     path('quiz-steps/<uuid:pk>/', views.QuizStepView.as_view(), name='quiz-read-submit'),
     path('sorting-steps/<uuid:pk>/', views.SortingStepView.as_view(), name='sorting-read-submit'),
+    path('text-problems/<uuid:pk>/', views.TextProblemView.as_view(), name='text-problem-read-submit'),
 
     path('courses/<uuid:course_id>/reviews/', views.ReviewListCreateView.as_view(), name='review-list-create'),
     path('reviews/<uuid:pk>/', views.ReviewRetrieveUpdateDestroyView.as_view(), name='review-retrieve-update-destroy'),
