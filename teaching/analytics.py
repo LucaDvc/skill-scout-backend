@@ -30,7 +30,7 @@ class CourseAssessmentAnalytics:
             total_attempts = performances.aggregate(Sum('attempts'))['attempts__sum'] or 0
             pass_count = performances.filter(passed=True).count()
             total_learners = performances.count()
-            success_rate = (pass_count / total_learners) * 100 if total_learners > 0 else 0
+            success_rate = (pass_count / total_attempts) * 100 if total_attempts > 0 else 0
 
             stats.append({
                 'lesson_id': step.base_step.lesson.id,
@@ -62,7 +62,7 @@ class CourseAssessmentAnalytics:
             total_attempts = submissions.aggregate(Sum('attempts'))['attempts__sum'] or 0
             pass_count = submissions.filter(passed=True).count()
             total_learners = submissions.count()
-            success_rate = (pass_count / total_learners) * 100 if total_learners > 0 else 0
+            success_rate = (pass_count / total_attempts) * 100 if total_attempts > 0 else 0
 
             stats.append({
                 'lesson_id': step.base_step.lesson.id,
