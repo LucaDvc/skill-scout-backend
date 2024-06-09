@@ -12,9 +12,9 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.views import APIView
 
 from courses.api.lesson_steps_serializers import QuizLessonStepSerializer, SortingProblemLessonStepSerializer, \
-    TextProblemLessonStepSerializer
+    TextProblemLessonStepSerializer, CodeChallengeLessonStepSerializer
 from courses.api.serializers import ReviewSerializer
-from learning.models import LearnerAssessmentStepPerformance
+from learning.models import LearnerAssessmentStepPerformance, CodeChallengeSubmission
 from teaching.models import EngagementAnalytics
 from .mixins import LearnerCourseViewMixin
 from .serializers import LearnerCourseSerializer, LearnerProgressSerializer
@@ -64,79 +64,101 @@ class LearnerCourseView(generics.RetrieveAPIView, LearnerCourseViewMixin):
         return Response(course_data)
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def submit_code_challenge(request, pk):
-    user = request.user
+class CodeChallengeView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    code = request.data.get('code')
-    if not code or not code.strip():
-        return Response({'error': 'code string cannot be blank'}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, pk):
+        user = request.user
 
-    acting_role = request.data.get('acting_role')
-    if not acting_role:
-        return Response({'error': 'acting_role is required'}, status=status.HTTP_400_BAD_REQUEST)
-    if acting_role not in ['instructor', 'learner']:
-        return Response({'error': 'invalid acting role'}, status=status.HTTP_400_BAD_REQUEST)
+        code = request.data.get('code')
+        if not code or not code.strip():
+            return Response({'error': 'code string cannot be blank'}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        code_challenge_step = CodeChallengeLessonStep.objects.prefetch_related('test_cases')
+        acting_role = request.data.get('acting_role')
+        if not acting_role:
+            return Response({'error': 'acting_role is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if acting_role not in ['instructor', 'learner']:
+            return Response({'error': 'invalid acting role'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if acting_role == 'instructor':
-            # Check if the user is the instructor for the course associated with this code challenge
-            code_challenge_step = code_challenge_step.get(
-                base_step_id=pk,
-                base_step__lesson__chapter__course__instructor=user
-            )
-        else:
-            # Check if the user is enrolled in the course associated with this code challenge
-            code_challenge_step = code_challenge_step.get(
+        try:
+            code_challenge_step = CodeChallengeLessonStep.objects.prefetch_related('test_cases')
+
+            if acting_role == 'instructor':
+                # Check if the user is the instructor for the course associated with this code challenge
+                code_challenge_step = code_challenge_step.get(
+                    base_step_id=pk,
+                    base_step__lesson__chapter__course__instructor=user
+                )
+            else:
+                # Check if the user is enrolled in the course associated with this code challenge
+                code_challenge_step = code_challenge_step.get(
+                    base_step_id=pk,
+                    base_step__lesson__chapter__course__enrolled_learners=user
+                )
+
+        except CodeChallengeLessonStep.DoesNotExist:
+            # Code challenge step does not exist or the user does not have the required role
+            return Response({'detail': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
+
+        code_challenge_id = code_challenge_step.base_step_id
+        cache.set(f'code_challenge_{code_challenge_id}', code_challenge_step, timeout=300)
+        is_instructor = (acting_role == 'instructor')
+        task = evaluate_code.delay(code, code_challenge_id, user.id, is_instructor)
+
+        return Response({"token": str(task.id)})
+
+    def get(self, request, pk):
+        user = request.user
+
+        try:
+            code_challenge_step = CodeChallengeLessonStep.objects.prefetch_related('test_cases').get(
                 base_step_id=pk,
                 base_step__lesson__chapter__course__enrolled_learners=user
             )
+        except CodeChallengeLessonStep.DoesNotExist:
+            return Response({'detail': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
-    except CodeChallengeLessonStep.DoesNotExist:
-        # Code challenge step does not exist or the user does not have the required role
-        return Response({'detail': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
+        code_challenge_data = CodeChallengeLessonStepSerializer(code_challenge_step).data
 
-    code_challenge_id = code_challenge_step.base_step_id
-    cache.set(f'code_challenge_{code_challenge_id}', code_challenge_step, timeout=300)
-    is_instructor = (acting_role == 'instructor')
-    task = evaluate_code.delay(code, code_challenge_id, user.id, is_instructor)
+        code_challenge_step_submission = CodeChallengeSubmission.objects.filter(learner=user,
+                                                                                code_challenge_step=code_challenge_step).first()
+        if code_challenge_step_submission:
+            code_challenge_data['submitted_code'] = code_challenge_step_submission.submitted_code
 
-    return Response({"token": str(task.id)})
+        return Response(code_challenge_data)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def check_code_challenge_result(request, task_id):
-    user = request.user
-    enrolled = CodeChallengeLessonStep.objects.filter(
-        base_step__lesson__chapter__course__enrolled_learners=user
-    ).exists()
-    if not enrolled:
-        return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+class CodeChallengeResultView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    # check if the task is done and return the result
-    result = AsyncResult(task_id)
+    def get(self, request, task_id):
+        user = request.user
+        enrolled = CodeChallengeLessonStep.objects.filter(
+            base_step__lesson__chapter__course__enrolled_learners=user
+        ).exists()
+        if not enrolled:
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
-    if result.ready():
-        if result.status == states.SUCCESS:
-            code_submission = result.result
-            response_data = {
-                'task_status': states.SUCCESS,
-                'submission': code_submission
-            }
-            return Response(response_data)
-        elif result.status == states.FAILURE:
-            exception_message = str(result.result) if result.result else "Unknown Error"
-            response_data = {
-                'task_status': states.FAILURE,
-                'error': exception_message
-            }
-            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-    else:
-        return Response({'status': states.PENDING})
+        # check if the task is done and return the result
+        result = AsyncResult(task_id)
+
+        if result.ready():
+            if result.status == states.SUCCESS:
+                code_submission = result.result
+                response_data = {
+                    'task_status': states.SUCCESS,
+                    'submission': code_submission
+                }
+                return Response(response_data)
+            elif result.status == states.FAILURE:
+                exception_message = str(result.result) if result.result else "Unknown Error"
+                response_data = {
+                    'task_status': states.FAILURE,
+                    'error': exception_message
+                }
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'status': states.PENDING})
 
 
 class QuizStepView(APIView):
