@@ -6,7 +6,7 @@ from django.core.cache import cache
 
 from courses.models import CodeChallengeLessonStep
 from learning.api.serializers import CodeChallengeSubmissionSerializer
-from learning.models import CodeChallengeSubmission, TestResult
+from learning.models import CodeChallengeSubmission, TestResult, LearnerAssessmentStepPerformance
 from learning.utils import batch_queryset
 
 from celery import shared_task
@@ -35,16 +35,18 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
     if not code_challenge_step:
         code_challenge_step = CodeChallengeLessonStep.objects.get(base_step_id=code_challenge_step_id)
     test_cases = code_challenge_step.test_cases.all()
-    with transaction.atomic():
-        code_challenge_submission, created = CodeChallengeSubmission.objects.get_or_create(
-            learner_id=learner_id,
-            code_challenge_step_id=code_challenge_step_id
-        )
-        code_challenge_submission.submitted_code = code
-        code_challenge_submission.error_message = None
-        if not created:
-            initial_attempts = code_challenge_submission.attempts
-        code_challenge_submission.save()
+
+    # Get or create the submission object, which has passed=False by default
+    code_challenge_submission, submission_created = CodeChallengeSubmission.objects.get_or_create(
+        learner_id=learner_id,
+        code_challenge_step_id=code_challenge_step_id
+    )
+
+    # Get or create the performance object, which has passed=False and attempts=1 by default
+    assessment_performance, performance_created = LearnerAssessmentStepPerformance.objects.get_or_create(
+        learner_id=learner_id,
+        base_step_id=code_challenge_step_id
+    )
 
     batch_size = 20
     batches = batch_queryset(test_cases, batch_size)
@@ -75,18 +77,21 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
 
         # call judge0 api to check batch results (with the tokens)
         # Set up a loop to poll the Judge0 API for the results
-        max_retries = 5
+        max_retries = 15
         retries = 0
         all_results_received = False
         while not all_results_received and retries < max_retries:
             tokens_to_remove = []
             all_results_received = True
+
             try:
                 result = judge0_service.get_batch_submission_result(submission_tokens)
             except requests.HTTPError as e:
                 retries += 1
                 all_results_received = False
+                time.sleep(0.5)
                 continue
+
             submissions = result.get('submissions', [])
             for submission in submissions:
                 status = submission.get('status', {}).get('description', '')
@@ -106,11 +111,17 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
 
                     if test_result.stderr or test_result.compile_err:
                         code_challenge_submission.error_message = f"Error: {test_result.stderr or test_result.compile_err}"
-                        code_challenge_submission.passed = False
-                        logger.error(f"Error encountered: {code_challenge_submission.error_message}")
+                        print(f"Error encountered: {code_challenge_submission.error_message}")
                         if not continue_on_error:
-                            logger.error("Stopping further processing due to error")
+                            print("Stopping further processing due to error")
+
+                            code_challenge_submission.passed = False
                             code_challenge_submission.save()
+
+                            if not (assessment_performance.passed or performance_created):
+                                assessment_performance.attempts += 1
+                            assessment_performance.save()
+
                             return CodeChallengeSubmissionSerializer(code_challenge_submission).data
                 else:
                     all_results_received = False  # Not all results are received, continue polling
@@ -118,18 +129,30 @@ def evaluate_code(self, code, code_challenge_step_id, learner_id, continue_on_er
                     break
 
             submission_tokens = [token for token in submission_tokens if token not in tokens_to_remove]
-            time.sleep(1)
+            print(f"Retries: {retries}")
+            print(f"Polling Judge0 API for results. Remaining tokens: {len(submission_tokens)}")
+            print(submission_tokens)
+
+            time.sleep(0.5)
 
         if not all_results_received:
-            # Rollback attempts count to the initial state
-            if not created:
-                code_challenge_submission.attempts = initial_attempts
-                code_challenge_submission.save()
-            raise self.retry(countdown=2)
+            raise self.retry(countdown=1)
 
-    # Increment attempts only if all batches processed successfully
-    if not created:
-        code_challenge_submission.attempts += 1
+    # At this point of execution all test cases have been processed without errors
+    code_challenge_submission.error_message = None
+    # Update the passed field based on the test results
+    related_test_results = code_challenge_submission.test_results.all()
+    all_passed = all(test_result.passed for test_result in related_test_results)
+    code_challenge_submission.passed = all_passed
+    # Store the user's code only if all test cases passed
+    if all_passed:
+        code_challenge_submission.submitted_code = code
+    code_challenge_submission.save()
 
-    code_challenge_submission.update_passed_status()
+    if not (performance_created or assessment_performance.passed):
+        assessment_performance.attempts += 1
+    if not assessment_performance.passed:
+        assessment_performance.passed = all_passed
+    assessment_performance.save()
+
     return CodeChallengeSubmissionSerializer(code_challenge_submission).data

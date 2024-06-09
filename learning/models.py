@@ -56,16 +56,9 @@ class CodeChallengeSubmission(models.Model):
     submitted_code = models.TextField(null=True, blank=True)  # change to false
     error_message = models.TextField(null=True, blank=True)
     passed = models.BooleanField(default=False)
-    attempts = models.PositiveIntegerField(default=1)
 
     class Meta:
         unique_together = ['learner', 'code_challenge_step']
-
-    def update_passed_status(self):
-        related_test_results = self.test_results.all()
-        all_passed = all(test_result.passed for test_result in related_test_results)
-        self.passed = all_passed
-        self.save()
 
 
 class TestResult(models.Model):
