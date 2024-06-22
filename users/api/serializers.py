@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 
+from .serializer_fields import ImageOrUrlField
 from courses.models import Course
 from users.api.mixins import PrivacyMixin
 from users.models import User
@@ -45,6 +46,7 @@ class SimpleCourseSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     wishlist = SimpleCourseSerializer(many=True, read_only=True)
     enrolled_courses = SimpleCourseSerializer(many=True, read_only=True)
+    picture = ImageOrUrlField(required=False, allow_null=True)
 
     class Meta:
         model = User
