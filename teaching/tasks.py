@@ -1,5 +1,8 @@
 from celery import shared_task
+from django.core.cache import cache
 from django.db import transaction
+
+from django.core.management import call_command
 from learning.models import LearnerProgress
 
 BATCH_SIZE = 1000  # Adjust the batch size according to your needs
@@ -36,3 +39,8 @@ def update_in_batches(queryset, field_name, item_id):
 
 def array_remove(array, element):
     return [x for x in array if x != element]
+
+
+@shared_task
+def refresh_learner_course_cache(course_id):
+    call_command('refresh_learner_cached_course', course_id)
