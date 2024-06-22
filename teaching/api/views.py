@@ -459,7 +459,14 @@ def publish_course(request, course_id):
     empty_chapters = chapters.filter(lesson=None)
     if empty_chapters.exists():
         return Response({
-            'detail': 'Course has empty chapters. Please add lessons to all chapters or remove the empty chapters before publishing'},
+            'detail': 'Course has empty chapters. Please add lessons to all chapters or remove the empty chapters before publishing.'},
+            status=status.HTTP_400_BAD_REQUEST)
+
+    # Course should not have empty lessons (lessons without lesson steps)
+    empty_lessons = lessons.filter(baselessonstep=None)
+    if empty_lessons.exists():
+        return Response({
+            'detail': 'Course has empty lessons. Please add lesson steps to all lessons or remove the empty lessons before publishing.'},
             status=status.HTTP_400_BAD_REQUEST)
 
     # All videos in video steps should have a video URL
