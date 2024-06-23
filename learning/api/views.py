@@ -553,3 +553,27 @@ def send_engagement_data(request):
     engagement.save()
 
     return Response({'detail': 'Engagement data sent'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def drop_course(request, pk):
+    user = request.user
+
+    course_id = pk
+    if not course_id:
+        return Response({'error': 'course_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    course_enrollment = CourseEnrollment.objects.filter(course_id=course_id, learner=user).first()
+
+    if not course_enrollment:
+        return Response({'error': 'You must be enrolled in this course to drop it'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    learner_progress = LearnerProgress.objects.filter(learner=user, course_id=course_id).first()
+    if learner_progress:
+        learner_progress.delete()
+
+    course_enrollment.delete()
+
+    return Response({'detail': 'Course dropped'}, status=status.HTTP_200_OK)
