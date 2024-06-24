@@ -86,6 +86,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
 
+    'corsheaders',
+
     'courses.apps.CoursesConfig',
     'users.apps.UsersConfig',
     'learning.apps.LearningConfig',
@@ -112,7 +114,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'courses_project.urls'
 
