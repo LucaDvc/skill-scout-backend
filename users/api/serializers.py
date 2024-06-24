@@ -15,10 +15,18 @@ class SimpleProfileSerializer(PrivacyMixin, serializers.ModelSerializer):
 
 class ProfileCourseSerializer(serializers.ModelSerializer):
     enrolled_learners = serializers.SerializerMethodField(read_only=True)
+    average_rating = serializers.SerializerMethodField(read_only=True)
+    reviews_no = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'total_hours', 'price', 'image', 'average_rating', 'enrolled_learners', 'intro']
+        fields = ['id', 'title', 'total_hours', 'price', 'image', 'average_rating', 'enrolled_learners', 'intro', 'reviews_no']
+
+    def get_average_rating(self, obj):
+        return obj.average_rating if obj.average_rating else 0
+
+    def get_reviews_no(self, obj):
+        return obj.review_set.count()
 
     def get_enrolled_learners(self, obj):
         return obj.enrolled_learners.count()
