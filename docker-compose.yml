@@ -14,7 +14,7 @@ services:
 
   web:
     build: .
-    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    command: ["gunicorn", "--bind", "0.0.0.0:8000", "courses_project.wsgi:application"]
     volumes:
       - .:/app
     ports:
@@ -48,3 +48,13 @@ services:
       - redis
       - web
       - celery_worker
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - .:/app
+    depends_on:
+      - web

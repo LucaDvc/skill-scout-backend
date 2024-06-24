@@ -33,7 +33,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG")
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
 
 
 # Application definition
@@ -256,7 +256,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "refresh_learner_courses_cache": {
         "task": "courses_project.tasks.refresh_learner_courses_cache",
-        "schedule": crontab(minute="*/5"),  # Every 5 minutes, but for production, change to every hour
+        "schedule": crontab(minute="*/5"),  # Every 60 minutes
     },
     "update_courses_daily_active_users": {
         "task": "courses_project.tasks.update_daily_active_users",
